@@ -69,12 +69,12 @@ export default function Dashboard({ allData, filters, onFilterChange, lastUpdate
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="dashboard-shell">
       {/* Header */}
-      <div className="flex justify-between items-start">
+      <div className="page-header">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-sm text-gray-600 mt-1">
+          <h1 className="page-title">Dashboard</h1>
+          <p className="page-subtitle">
             Data Last Updated: {formatLastUpdated()}
           </p>
         </div>

@@ -1,6 +1,6 @@
 import { cn } from '../utils/cn';
 
-type Page = 'dashboard' | 'future' | 'monthly' | 'berths' | 'ownership' | 'reports' | 'quality' | 'compliance';
+type Page = 'dashboard' | 'future' | 'future-bookings' | 'monthly' | 'berths' | 'ownership' | 'reports' | 'quality' | 'compliance';
 
 interface SidebarProps {
   currentPage: Page;
@@ -10,6 +10,7 @@ interface SidebarProps {
 const navigation = [
   { name: 'Dashboard', id: 'dashboard' as Page, icon: '📊' },
   { name: 'Future Availability', id: 'future' as Page, icon: '📅' },
+  { name: 'Future Bookings', id: 'future-bookings' as Page, icon: '📌' },
   // { name: 'Monthly Occupancy', id: 'monthly' as Page, icon: '📈' }, // Hidden for now
   { name: 'Berths', id: 'berths' as Page, icon: '⚓' },
   { name: 'Ownership', id: 'ownership' as Page, icon: '🏢' },

@@ -1,6 +1,6 @@
 import { BerthRecord } from '../types/berth';
 import { calculatePierOccupancy } from '../utils/dataUtils';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 interface PierOccupancyChartProps {
   data: BerthRecord[];
@@ -9,33 +9,58 @@ interface PierOccupancyChartProps {
 export default function PierOccupancyChart({ data }: PierOccupancyChartProps) {
   const pierData = calculatePierOccupancy(data);
 
-  const getBarColor = (index: number) => {
-    const colors = ['#1e40af', '#7c3aed', '#db2777', '#dc2626', '#ea580c', '#16a34a', '#0891b2'];
-    return colors[index % colors.length];
-  };
-
   return (
-    <div className="card">
-      <div className="card-header">
-        <h3 className="card-title">Occupancy by Pier</h3>
+    <div className="card overflow-hidden">
+      <div className="card-header flex items-center justify-between">
+        <div>
+          <h3 className="card-title">Occupancy by Pier</h3>
+          <p className="mt-1 text-sm text-slate-500">Stacked berth status across each pier</p>
+        </div>
+        <div className="rounded-full bg-navy-50 px-3 py-1 text-xs font-semibold text-navy-700">
+          {pierData.length} piers
+        </div>
       </div>
-      <ResponsiveContainer width="100%" height={300}>
-        <BarChart data={pierData} layout="vertical">
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis type="number" tick={{ fontSize: 12 }} />
-          <YAxis dataKey="pier" type="category" tickFormatter={(value) => `Pier ${value}`} tick={{ fontSize: 12 }} width={60} />
-          <Tooltip
-            formatter={(value: any, name: string) => {
-              if (name === 'occupancyPercentage') return [`${value.toFixed(1)}%`, 'Occupancy'];
-              return [value, name];
-            }}
-          />
-          <Legend />
-          <Bar dataKey="occupied" name="Occupied" fill="#dc2626" stackId="a" />
-          <Bar dataKey="booked" name="Booked" fill="#ea580c" stackId="a" />
-          <Bar dataKey="available" name="Available" fill="#16a34a" stackId="a" />
-        </BarChart>
-      </ResponsiveContainer>
+
+      <div className="h-[330px] w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={pierData} layout="vertical" margin={{ top: 8, right: 20, left: 8, bottom: 8 }}>
+            <CartesianGrid strokeDasharray="4 4" stroke="#e2e8f0" horizontal={false} />
+            <XAxis
+              type="number"
+              tick={{ fill: '#475569', fontSize: 12 }}
+              axisLine={{ stroke: '#cbd5e1' }}
+              tickLine={false}
+            />
+            <YAxis
+              dataKey="pier"
+              type="category"
+              tickFormatter={(value) => `Pier ${value}`}
+              tick={{ fill: '#475569', fontSize: 12 }}
+              width={60}
+              axisLine={{ stroke: '#cbd5e1' }}
+              tickLine={false}
+            />
+            <Tooltip
+              cursor={{ fill: 'rgba(148, 163, 184, 0.08)' }}
+              contentStyle={{
+                borderRadius: '12px',
+                border: '1px solid #e2e8f0',
+                boxShadow: '0 10px 15px -3px rgba(15, 23, 42, 0.08)',
+              }}
+              formatter={(value: number, name: string) => {
+                return [value, name];
+              }}
+            />
+            <Legend
+              wrapperStyle={{ paddingTop: 12, fontSize: '12px' }}
+              iconType="circle"
+            />
+            <Bar dataKey="occupied" name="Occupied" fill="#ef4444" stackId="a" radius={[0, 6, 6, 0]} />
+            <Bar dataKey="booked" name="Booked" fill="#f59e0b" stackId="a" radius={[0, 6, 6, 0]} />
+            <Bar dataKey="available" name="Available" fill="#22c55e" stackId="a" radius={[0, 6, 6, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }

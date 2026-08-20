@@ -3,14 +3,39 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    color-scheme: light;
+  }
+
   body {
-    @apply bg-gray-50 text-gray-900;
+    @apply bg-slate-100 text-slate-800 antialiased;
+    background-image: radial-gradient(circle at top left, rgba(37, 99, 235, 0.12), transparent 28%), linear-gradient(180deg, #f8fafc 0%, #eef5ff 100%);
+  }
+
+  #root {
+    @apply min-h-screen;
   }
 }
 
 @layer components {
+  .dashboard-shell {
+    @apply p-6 md:p-8 space-y-6;
+  }
+
+  .page-header {
+    @apply flex flex-col gap-4 md:flex-row md:items-center md:justify-between;
+  }
+
+  .page-title {
+    @apply text-3xl font-bold tracking-tight text-slate-900;
+  }
+
+  .page-subtitle {
+    @apply text-sm text-slate-500 mt-1;
+  }
+
   .card {
-    @apply bg-white rounded-lg shadow-sm border border-gray-200 p-6;
+    @apply bg-white rounded-2xl shadow-sm border border-slate-200 p-6;
   }
   
   .card-header {
@@ -18,7 +43,7 @@
   }
   
   .card-title {
-    @apply text-lg font-semibold text-gray-900;
+    @apply text-lg font-semibold text-slate-900;
   }
   
   .badge {
@@ -40,17 +65,26 @@
   .badge-info {
     @apply bg-blue-100 text-blue-800;
   }
+
+  .metric-card {
+    @apply relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md;
+  }
+
+  .metric-card::before {
+    content: "";
+    @apply absolute inset-x-0 top-0 h-1;
+  }
   
   .btn {
-    @apply inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm;
+    @apply inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm transition-colors duration-150;
   }
   
   .btn-primary {
-    @apply bg-navy-700 text-white hover:bg-navy-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-navy-500;
+    @apply bg-gradient-to-r from-navy-700 to-navy-800 text-white hover:from-navy-800 hover:to-navy-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-navy-500;
   }
   
   .btn-secondary {
-    @apply bg-white text-gray-700 border-gray-300 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-navy-500;
+    @apply bg-white text-slate-700 border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-navy-500;
   }
   
   .btn-danger {
@@ -58,10 +92,10 @@
   }
   
   .input {
-    @apply block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-navy-500 focus:border-navy-500 sm:text-sm;
+    @apply block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-navy-500 focus:border-navy-500 sm:text-sm;
   }
   
   .select {
-    @apply block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-navy-500 focus:border-navy-500 sm:text-sm;
+    @apply block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-navy-500 focus:border-navy-500 sm:text-sm;
   }
 }

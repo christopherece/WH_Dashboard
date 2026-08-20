@@ -325,37 +325,24 @@ export function formatNumber(num: number): string {
   return new Intl.NumberFormat('en-NZ').format(num);
 }
 
-export function exportToCSV(data: BerthRecord[], filename: string): void {
+export function exportToCSV(data: Record<string, any>[], filename: string): void {
   if (!data || data.length === 0) {
     console.warn('No data to export');
     return;
   }
 
-  const headers = [
-    'Berth', 'Pier', 'Berth Type', 'Length', 'Width', 'Depth',
-    'Marina', 'Status', 'Ownership Type', 'Occupancy Status',
-    'Customer', 'Vessel', 'Date In', 'Date Out'
+  const headers = Array.from(new Set(data.flatMap(row => Object.keys(row || {})))) as string[];
+
+  const csvRows = [
+    headers.map(header => `"${header}"`).join(','),
+    ...data.map(row => headers.map(header => {
+      const value = row?.[header];
+      const normalised = value instanceof Date ? formatDate(value) : value ?? '';
+      return `"${String(normalised).replace(/"/g, '""')}"`;
+    }).join(','))
   ];
 
-  const csvContent = [
-    headers.join(','),
-    ...data.map(row => [
-      row.berth || '',
-      row.pier || '',
-      row.berthType || '',
-      row.nominalLength || '',
-      row.nominalWidth || '',
-      row.nominalDepth || '',
-      row.marina || '',
-      row.berthStatus || '',
-      row.ownershipType || '',
-      row.occupancyStatus || '',
-      row.customerName || '',
-      row.vesselName || '',
-      formatDate(row.dateIn),
-      formatDate(row.dateOut),
-    ].join(','))
-  ].join('\n');
+  const csvContent = csvRows.join('\n');
 
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a');

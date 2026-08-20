@@ -13,8 +13,9 @@ import DataQuality from './pages/DataQuality';
 import VesselComplianceReport from './pages/VesselComplianceReport';
 import LoadingSpinner from './components/LoadingSpinner';
 import ErrorMessage from './components/ErrorMessage';
+import FutureBookings from './pages/FutureBookings';
 
-type Page = 'dashboard' | 'future' | 'monthly' | 'berths' | 'ownership' | 'reports' | 'quality' | 'compliance';
+type Page = 'dashboard' | 'future' | 'future-bookings' | 'monthly' | 'berths' | 'ownership' | 'reports' | 'quality' | 'compliance';
 
 function App() {
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
@@ -83,6 +84,8 @@ function App() {
         return <Dashboard allData={data} filters={filters} onFilterChange={handleFilterChange} lastUpdated={lastUpdated} onRefresh={handleRefresh} />;
       case 'future':
         return <FutureAvailability allData={data} filters={filters} lastUpdated={lastUpdated} onRefresh={handleRefresh} />;
+      case 'future-bookings':
+        return <FutureBookings data={filteredData} lastUpdated={lastUpdated} onRefresh={handleRefresh} />;
       case 'monthly':
         return <MonthlyOccupancy data={filteredData} lastUpdated={lastUpdated} onRefresh={handleRefresh} />;
       case 'berths':

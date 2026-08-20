@@ -8,7 +8,7 @@ interface ReportsProps {
   onRefresh: () => void;
 }
 
-type ReportType = 'occupancy' | 'availability' | 'pier' | 'ownership' | 'berthType';
+type ReportType = 'occupancy' | 'availability' | 'pier' | 'ownership' | 'berthType' | 'futureStatus';
 
 export default function Reports({ data, lastUpdated, onRefresh }: ReportsProps) {
   const [selectedReport, setSelectedReport] = useState<ReportType>('occupancy');
@@ -25,6 +25,8 @@ export default function Reports({ data, lastUpdated, onRefresh }: ReportsProps) 
         return generateOwnershipReport();
       case 'berthType':
         return generateBerthTypeReport();
+      case 'futureStatus':
+        return generateFutureStatusReport();
       default:
         return [];
     }
@@ -65,6 +67,24 @@ export default function Reports({ data, lastUpdated, onRefresh }: ReportsProps) 
     return calculateBerthTypeOccupancy(data);
   };
 
+  const generateFutureStatusReport = () => {
+    return data
+      .filter(r => r.occupancyStatus === 'Future Booking' || r.occupancyStatus === 'Future Rental')
+      .map(r => ({
+        berth: r.berth,
+        marina: r.marina,
+        pier: r.pier,
+        berthType: r.berthType,
+        occupancyStatus: r.occupancyStatus,
+        ownershipType: r.ownershipType,
+        customerName: r.customerName || '—',
+        vesselName: r.vesselName || '—',
+        dateIn: r.dateIn ? r.dateIn.toLocaleDateString('en-NZ') : '—',
+        dateOut: r.dateOut ? r.dateOut.toLocaleDateString('en-NZ') : '—',
+        bookingEnteredDate: r.bookingEnteredDate ? r.bookingEnteredDate.toLocaleDateString('en-NZ') : '—',
+      }));
+  };
+
   const handleExport = () => {
     const reportData = generateReport();
     const filename = `${selectedReport}-report.csv`;
@@ -77,6 +97,7 @@ export default function Reports({ data, lastUpdated, onRefresh }: ReportsProps) 
     { id: 'pier' as ReportType, name: 'Pier Occupancy' },
     { id: 'ownership' as ReportType, name: 'Ownership Summary' },
     { id: 'berthType' as ReportType, name: 'Berth Type Analysis' },
+    { id: 'futureStatus' as ReportType, name: 'Future Booking & Rental' },
   ];
 
   const reportData = generateReport();
