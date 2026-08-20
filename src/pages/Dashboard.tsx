@@ -35,6 +35,35 @@ export default function Dashboard({ allData, filters, onFilterChange, lastUpdate
 
   const kpiMetrics = useMemo(() => calculateKPIMetrics(filteredData), [filteredData]);
 
+  const customerAgeSummary = useMemo(() => {
+    const validAges = filteredData
+      .map((record) => {
+        if (!record.customerDateOfBirth || Number.isNaN(record.customerDateOfBirth.getTime())) {
+          return null;
+        }
+
+        const today = new Date();
+        let age = today.getFullYear() - record.customerDateOfBirth.getFullYear();
+        const monthDiff = today.getMonth() - record.customerDateOfBirth.getMonth();
+
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < record.customerDateOfBirth.getDate())) {
+          age -= 1;
+        }
+
+        return age;
+      })
+      .filter((age): age is number => age !== null);
+
+    if (!validAges.length) {
+      return { averageAge: null, customerCount: 0 };
+    }
+
+    return {
+      averageAge: Number((validAges.reduce((sum, age) => sum + age, 0) / validAges.length).toFixed(1)),
+      customerCount: validAges.length,
+    };
+  }, [filteredData]);
+
   const handleFilterChange = (newFilters: FilterState) => {
     setLocalFilters(newFilters);
     onFilterChange(newFilters);
@@ -98,22 +127,51 @@ export default function Dashboard({ allData, filters, onFilterChange, lastUpdate
       />
 
       {/* KPI Cards */}
-      <KPICards metrics={kpiMetrics} />
+      <KPICards
+        metrics={kpiMetrics}
+        averageCustomerAge={customerAgeSummary.averageAge}
+        customersWithDob={customerAgeSummary.customerCount}
+      />
 
-      {/* Management Summary */}
-      <ManagementSummary data={filteredData} metrics={kpiMetrics} />
+      <div className="grid grid-cols-1 xl:grid-cols-[1.5fr_0.9fr] gap-6">
+        <ManagementSummary data={filteredData} metrics={kpiMetrics} />
 
-      {/* Occupancy Gauge */}
-      <OccupancyGauge occupancy={kpiMetrics.occupancyPercentage} />
+        <div className="card bg-gradient-to-br from-navy-50 to-white">
+          <div className="card-header">
+            <h3 className="card-title">Operational Highlights</h3>
+          </div>
+
+          <div className="space-y-4">
+            <div className="rounded-xl border border-slate-200 bg-white p-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Fleet Overview</p>
+              <p className="mt-2 text-3xl font-bold text-slate-900">{kpiMetrics.totalActiveBerths}</p>
+              <p className="mt-1 text-sm text-slate-500">total active berths in view</p>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-white p-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Customer Age</p>
+              <p className="mt-2 text-3xl font-bold text-violet-700">{customerAgeSummary.averageAge !== null ? `${customerAgeSummary.averageAge} yrs` : 'N/A'}</p>
+              <p className="mt-1 text-sm text-slate-500">{customerAgeSummary.customerCount} customers with valid DOB</p>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-white p-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Occupancy Gauge</p>
+              <div className="mt-3">
+                <OccupancyGauge occupancy={kpiMetrics.occupancyPercentage} />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <OccupancyTrendChart data={filteredData} />
         <PierOccupancyChart data={filteredData} />
       </div>
 
       {/* More Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <BerthTypeChart data={filteredData} />
         <OwnershipChart data={filteredData} />
         <LengthChart data={filteredData} />

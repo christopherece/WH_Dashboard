@@ -64,7 +64,7 @@ export default function OccupancyTrendChart({ data }: OccupancyTrendChartProps) 
           </select>
         </div>
       </div>
-      <ResponsiveContainer width="100%" height={300}>
+      <ResponsiveContainer width="100%" height={360}>
         <LineChart data={trendData}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis 

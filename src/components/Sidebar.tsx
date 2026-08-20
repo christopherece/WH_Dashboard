@@ -1,6 +1,6 @@
 import { cn } from '../utils/cn';
 
-type Page = 'dashboard' | 'future' | 'future-bookings' | 'monthly' | 'berths' | 'ownership' | 'reports' | 'quality' | 'compliance';
+type Page = 'dashboard' | 'future' | 'future-bookings' | 'marina-map' | 'customer-heatmap' | 'customer-age' | 'monthly' | 'berths' | 'ownership' | 'reports' | 'quality' | 'compliance';
 
 interface SidebarProps {
   currentPage: Page;
@@ -11,6 +11,9 @@ const navigation = [
   { name: 'Dashboard', id: 'dashboard' as Page, icon: '📊' },
   { name: 'Future Availability', id: 'future' as Page, icon: '📅' },
   { name: 'Future Bookings', id: 'future-bookings' as Page, icon: '📌' },
+  { name: 'Marina Map', id: 'marina-map' as Page, icon: '🗺️' },
+  { name: 'Customer Heat Map', id: 'customer-heatmap' as Page, icon: '🔥' },
+  { name: 'Customer Age Report', id: 'customer-age' as Page, icon: '👥' },
   // { name: 'Monthly Occupancy', id: 'monthly' as Page, icon: '📈' }, // Hidden for now
   { name: 'Berths', id: 'berths' as Page, icon: '⚓' },
   { name: 'Ownership', id: 'ownership' as Page, icon: '🏢' },

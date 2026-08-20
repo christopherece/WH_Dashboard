@@ -14,7 +14,7 @@ export default function LengthChart({ data }: LengthChartProps) {
       <div className="card-header">
         <h3 className="card-title">Occupancy by Actual Berth Length</h3>
       </div>
-      <ResponsiveContainer width="100%" height={300}>
+      <ResponsiveContainer width="100%" height={360}>
         <BarChart data={lengthData}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis 

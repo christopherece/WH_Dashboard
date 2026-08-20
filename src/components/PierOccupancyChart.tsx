@@ -21,7 +21,7 @@ export default function PierOccupancyChart({ data }: PierOccupancyChartProps) {
         </div>
       </div>
 
-      <div className="h-[330px] w-full">
+      <div className="h-[380px] w-full">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={pierData} layout="vertical" margin={{ top: 8, right: 20, left: 8, bottom: 8 }}>
             <CartesianGrid strokeDasharray="4 4" stroke="#e2e8f0" horizontal={false} />

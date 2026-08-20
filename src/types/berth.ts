@@ -23,11 +23,24 @@ export interface BerthRecord {
   bookingEnteredDate: Date | null;
   customerId: string | null;
   customerName: string | null;
+  customerAddressLine1: string | null;
+  customerAddressLine2: string | null;
+  customerAddressLine3: string | null;
+  customerAddressLine4: string | null;
+  customerAddressLine5: string | null;
+  customerCountryCode: string | null;
+  customerPostCode: string | null;
+  customerCity: string | null;
+  customerRegion: string | null;
+  customerDateOfBirth: Date | null;
   vesselId: string | null;
   vesselName: string | null;
   serviceStatus: string | null;
   serviceLineType: string | null;
   // Vessel compliance fields
+  powerConnectionType: string | null;
+  ewofRequired: boolean;
+  tntRequired: boolean;
   insuranceExpiry: Date | null;
   ewofExpiry: Date | null;
   tntExpiry: Date | null;
@@ -127,6 +140,9 @@ export interface VesselCompliance {
   berth: string;
   pier: string | number;
   customerName: string | null;
+  powerConnectionType: string | null;
+  ewofRequired: boolean;
+  tntRequired: boolean;
   insuranceExpiry: Date | null;
   ewofExpiry: Date | null;
   tntExpiry: Date | null;

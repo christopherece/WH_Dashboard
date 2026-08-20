@@ -18,40 +18,51 @@ export default function ManagementSummary({ data, metrics }: ManagementSummaryPr
     : null;
 
   return (
-    <div className="card">
-      <div className="card-header">
-        <h3 className="card-title">Management Summary</h3>
+    <div className="card bg-gradient-to-br from-slate-50 to-white">
+      <div className="card-header flex items-center justify-between">
+        <div>
+          <h3 className="card-title">Management Summary</h3>
+          <p className="mt-1 text-sm text-slate-500">Live operational snapshot</p>
+        </div>
+        <span className="rounded-full bg-navy-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-navy-700">
+          Live
+        </span>
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-        <div>
-          <p className="text-sm text-gray-600">Current Occupancy</p>
-          <p className="text-2xl font-bold text-navy-700">{metrics.occupancyPercentage.toFixed(1)}%</p>
+
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Current Occupancy</p>
+          <p className="mt-2 text-2xl font-bold text-navy-700">{metrics.occupancyPercentage.toFixed(1)}%</p>
         </div>
-        <div>
-          <p className="text-sm text-gray-600">Available Berths</p>
-          <p className="text-2xl font-bold text-green-600">{metrics.available}</p>
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Available</p>
+          <p className="mt-2 text-2xl font-bold text-emerald-600">{metrics.available}</p>
         </div>
-        <div>
-          <p className="text-sm text-gray-600">Booked</p>
-          <p className="text-2xl font-bold text-orange-600">{metrics.booked}</p>
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Booked</p>
+          <p className="mt-2 text-2xl font-bold text-amber-600">{metrics.booked}</p>
         </div>
-        <div>
-          <p className="text-sm text-gray-600">Rented</p>
-          <p className="text-2xl font-bold text-red-600">{metrics.occupied}</p>
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Rented</p>
+          <p className="mt-2 text-2xl font-bold text-rose-600">{metrics.occupied}</p>
         </div>
+      </div>
+
+      <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
         {highestOccupancyPier && (
-          <div>
-            <p className="text-sm text-gray-600">Highest Occupancy Pier</p>
-            <p className="text-lg font-semibold text-gray-900">
-              Pier {highestOccupancyPier.pier} ({highestOccupancyPier.occupancyPercentage.toFixed(1)}%)
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-emerald-700">Highest Occupancy Pier</p>
+            <p className="mt-2 text-lg font-semibold text-slate-900">
+              Pier {highestOccupancyPier.pier} <span className="text-emerald-700">({highestOccupancyPier.occupancyPercentage.toFixed(1)}%)</span>
             </p>
           </div>
         )}
+
         {lowestOccupancyPier && (
-          <div>
-            <p className="text-sm text-gray-600">Lowest Occupancy Pier</p>
-            <p className="text-lg font-semibold text-gray-900">
-              Pier {lowestOccupancyPier.pier} ({lowestOccupancyPier.occupancyPercentage.toFixed(1)}%)
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-amber-700">Lowest Occupancy Pier</p>
+            <p className="mt-2 text-lg font-semibold text-slate-900">
+              Pier {lowestOccupancyPier.pier} <span className="text-amber-700">({lowestOccupancyPier.occupancyPercentage.toFixed(1)}%)</span>
             </p>
           </div>
         )}

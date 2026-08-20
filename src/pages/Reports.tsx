@@ -8,7 +8,21 @@ interface ReportsProps {
   onRefresh: () => void;
 }
 
-type ReportType = 'occupancy' | 'availability' | 'pier' | 'ownership' | 'berthType' | 'futureStatus';
+type ReportType = 'occupancy' | 'availability' | 'pier' | 'ownership' | 'berthType' | 'futureStatus' | 'customerAge';
+
+const calculateCustomerAge = (dateOfBirth: Date | null): number | null => {
+  if (!dateOfBirth || Number.isNaN(dateOfBirth.getTime())) return null;
+
+  const today = new Date();
+  let age = today.getFullYear() - dateOfBirth.getFullYear();
+  const monthDiff = today.getMonth() - dateOfBirth.getMonth();
+
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dateOfBirth.getDate())) {
+    age -= 1;
+  }
+
+  return age;
+};
 
 export default function Reports({ data, lastUpdated, onRefresh }: ReportsProps) {
   const [selectedReport, setSelectedReport] = useState<ReportType>('occupancy');
@@ -27,6 +41,8 @@ export default function Reports({ data, lastUpdated, onRefresh }: ReportsProps) 
         return generateBerthTypeReport();
       case 'futureStatus':
         return generateFutureStatusReport();
+      case 'customerAge':
+        return generateCustomerAgeReport();
       default:
         return [];
     }
@@ -85,6 +101,50 @@ export default function Reports({ data, lastUpdated, onRefresh }: ReportsProps) 
       }));
   };
 
+  const generateCustomerAgeReport = () => {
+    const validRecords = data.filter(r => r.customerDateOfBirth && !Number.isNaN(r.customerDateOfBirth.getTime()));
+
+    if (validRecords.length === 0) {
+      return [{ ageBand: 'No DOB data', customerCount: 0, percentage: 0 }];
+    }
+
+    const ageBands = [
+      { label: 'Under 18', min: 0, max: 17 },
+      { label: '18-24', min: 18, max: 24 },
+      { label: '25-34', min: 25, max: 34 },
+      { label: '35-44', min: 35, max: 44 },
+      { label: '45-54', min: 45, max: 54 },
+      { label: '55-64', min: 55, max: 64 },
+      { label: '65+', min: 65, max: 200 },
+    ];
+
+    const rows = ageBands.map(band => {
+      const customerCount = validRecords.filter(record => {
+        const age = calculateCustomerAge(record.customerDateOfBirth);
+        return age !== null && age >= band.min && age <= band.max;
+      }).length;
+
+      const percentage = (customerCount / validRecords.length) * 100;
+
+      return {
+        ageBand: band.label,
+        customerCount,
+        percentage: Number(percentage.toFixed(1)),
+      };
+    }).filter(row => row.customerCount > 0);
+
+    const averageAge = validRecords.reduce((sum, record) => {
+      const age = calculateCustomerAge(record.customerDateOfBirth);
+      return sum + (age ?? 0);
+    }, 0) / validRecords.length;
+
+    return [
+      { ageBand: 'Customers with DOB', customerCount: validRecords.length, percentage: 100 },
+      { ageBand: 'Average Age', customerCount: Number(averageAge.toFixed(1)), percentage: 0 },
+      ...rows,
+    ];
+  };
+
   const handleExport = () => {
     const reportData = generateReport();
     const filename = `${selectedReport}-report.csv`;
@@ -98,6 +158,7 @@ export default function Reports({ data, lastUpdated, onRefresh }: ReportsProps) 
     { id: 'ownership' as ReportType, name: 'Ownership Summary' },
     { id: 'berthType' as ReportType, name: 'Berth Type Analysis' },
     { id: 'futureStatus' as ReportType, name: 'Future Booking & Rental' },
+    { id: 'customerAge' as ReportType, name: 'Customer Age Statistics' },
   ];
 
   const reportData = generateReport();

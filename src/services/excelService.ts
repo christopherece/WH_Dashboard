@@ -68,42 +68,67 @@ export class ExcelService {
   private parseData(rawData: any[]): BerthRecord[] {
     return rawData.map((row: any, index: number) => {
       try {
+        const normalizedRow = this.normalizeRowKeys(row);
+
         // Parse berth as string since it contains alphanumeric values like "AA01"
-        const berthValue = row.Berth || row.BerthNumber || row.BerthNo || row.BerthNo || row['Berth No'] || row['Berth Number'] || row.BERTH;
+        const berthValue = this.getFirstValue(normalizedRow, ['Berth', 'BerthNumber', 'BerthNo', 'Berth Number', 'Berth Number', 'BERTH']);
         const berth = this.parseString(berthValue);
 
         return {
-          berthId: this.parseNumber(row.BerthID || row.ID || row.Id),
+          berthId: this.parseNumber(this.getFirstValue(normalizedRow, ['BerthID', 'ID', 'Id'])),
           berth: berth,
-          pier: this.parseStringOrNumber(row.Pier || row.PIER),
-          berthType: this.parseString(row.BerthType || row.Type || row.TYPE),
-          nominalLength: this.parseNumber(row.NominalLength || row.Length || row.LENGTH),
-          nominalWidth: this.parseNumber(row.NominalWidth || row.Width),
-          nominalDepth: this.parseNumber(row.NominalDepth || row.Depth),
-          actualLength: this.parseNumber(row.ActualLength),
-          actualWidth: this.parseNumber(row.ActualWidth),
-          actualDepth: this.parseNumber(row.ActualDepth),
-          marina: this.parseString(row.Marina || row.MARINA),
-          berthStatus: this.parseString(row.BerthStatus || row.Status || row.STATUS),
-          ownershipTypeId: this.parseNumber(row.OwnershipTypeID),
-          ownershipType: this.parseString(row.OwnershipType || row.Ownership),
-          occupancyStatus: this.parseString(row.OccupancyStatus),
-          occupiedFlag: this.parseNumber(row.OccupiedFlag),
-          availableFlag: this.parseNumber(row.AvailableFlag),
-          rentalAgreementId: this.parseNullableString(row.RentalAgreementID),
-          bookingId: this.parseNullableString(row.BookingID),
-          dateIn: this.parseDate(row.DateIn),
-          dateOut: this.parseDate(row.DateOut),
-          bookingEnteredDate: this.parseDate(row.BookingEnteredDate),
-          customerId: this.parseNullableString(row.CustomerID),
-          customerName: this.parseNullableString(row.CustomerName),
-          vesselId: this.parseNullableString(row.VesselID),
-          vesselName: this.parseNullableString(row.VesselName),
-          serviceStatus: this.parseNullableString(row.ServiceStatus),
-          serviceLineType: this.parseNullableString(row.ServiceLineType),
-          insuranceExpiry: this.parseDate(row.InsuranceExpiry),
-          ewofExpiry: this.parseDate(row.EWOFExpiry),
-          tntExpiry: this.parseDate(row.TNTExpiry),
+          pier: this.parseStringOrNumber(this.getFirstValue(normalizedRow, ['Pier', 'PIER'])),
+          berthType: this.parseString(this.getFirstValue(normalizedRow, ['BerthType', 'Type', 'TYPE'])),
+          nominalLength: this.parseNumber(this.getFirstValue(normalizedRow, ['NominalLength', 'Length', 'LENGTH'])),
+          nominalWidth: this.parseNumber(this.getFirstValue(normalizedRow, ['NominalWidth', 'Width'])),
+          nominalDepth: this.parseNumber(this.getFirstValue(normalizedRow, ['NominalDepth', 'Depth'])),
+          actualLength: this.parseNumber(this.getFirstValue(normalizedRow, ['ActualLength'])),
+          actualWidth: this.parseNumber(this.getFirstValue(normalizedRow, ['ActualWidth'])),
+          actualDepth: this.parseNumber(this.getFirstValue(normalizedRow, ['ActualDepth'])),
+          marina: this.parseString(this.getFirstValue(normalizedRow, ['Marina', 'MARINA'])),
+          berthStatus: this.parseString(this.getFirstValue(normalizedRow, ['BerthStatus', 'Status', 'STATUS'])),
+          ownershipTypeId: this.parseNumber(this.getFirstValue(normalizedRow, ['OwnershipTypeID'])),
+          ownershipType: this.parseString(this.getFirstValue(normalizedRow, ['OwnershipType', 'Ownership'])),
+          occupancyStatus: this.parseString(this.getFirstValue(normalizedRow, ['OccupancyStatus'])),
+          occupiedFlag: this.parseNumber(this.getFirstValue(normalizedRow, ['OccupiedFlag'])),
+          availableFlag: this.parseNumber(this.getFirstValue(normalizedRow, ['AvailableFlag'])),
+          rentalAgreementId: this.parseNullableString(this.getFirstValue(normalizedRow, ['RentalAgreementID'])),
+          bookingId: this.parseNullableString(this.getFirstValue(normalizedRow, ['BookingID'])),
+          dateIn: this.parseDate(this.getFirstValue(normalizedRow, ['DateIn'])),
+          dateOut: this.parseDate(this.getFirstValue(normalizedRow, ['DateOut'])),
+          bookingEnteredDate: this.parseDate(this.getFirstValue(normalizedRow, ['BookingEnteredDate'])),
+          customerId: this.parseNullableString(this.getFirstValue(normalizedRow, ['CustomerID'])),
+          customerName: this.parseNullableString(this.getFirstValue(normalizedRow, ['CustomerName'])),
+          customerAddressLine1: this.parseNullableString(this.getFirstValue(normalizedRow, ['CustomerAddressLine1'])),
+          customerAddressLine2: this.parseNullableString(this.getFirstValue(normalizedRow, ['CustomerAddressLine2'])),
+          customerAddressLine3: this.parseNullableString(this.getFirstValue(normalizedRow, ['CustomerAddressLine3'])),
+          customerAddressLine4: this.parseNullableString(this.getFirstValue(normalizedRow, ['CustomerAddressLine4'])),
+          customerAddressLine5: this.parseNullableString(this.getFirstValue(normalizedRow, ['CustomerAddressLine5'])),
+          customerCountryCode: this.parseNullableString(this.getFirstValue(normalizedRow, ['CustomerCountryCode'])),
+          customerPostCode: this.parseNullableString(this.getFirstValue(normalizedRow, ['CustomerPostCode'])),
+          customerCity: this.parseNullableString(this.getFirstValue(normalizedRow, ['CustomerCity', 'City', 'Suburb', 'CustomerAddressLine3', 'CustomerAddressLine5', 'CustomerAddressLine4'])),
+          customerRegion: this.parseNullableString(this.getFirstValue(normalizedRow, ['Region', 'State', 'CustomerAddressLine4', 'CustomerAddressLine5', 'CustomerCountryCode'])),
+          customerDateOfBirth: this.parseDate(this.getFirstValue(normalizedRow, [
+            'CustomerDateOfBirth',
+            'CustomerDateofBirth',
+            'CustomerDAteofBirth',
+            'CustomerDOB',
+            'CustomerBirthDate',
+            'Customer Date Of Birth',
+            'Customer Birth Date',
+            'DateOfBirth',
+            'DOB'
+          ])),
+          vesselId: this.parseNullableString(this.getFirstValue(normalizedRow, ['VesselID'])),
+          vesselName: this.parseNullableString(this.getFirstValue(normalizedRow, ['VesselName'])),
+          serviceStatus: this.parseNullableString(this.getFirstValue(normalizedRow, ['ServiceStatus'])),
+          serviceLineType: this.parseNullableString(this.getFirstValue(normalizedRow, ['ServiceLineType'])),
+          powerConnectionType: this.parseNullableString(this.getFirstValue(normalizedRow, ['PowerConnectionType'])),
+          ewofRequired: this.parseRequiredFlag(this.getFirstValue(normalizedRow, ['EWOFRequired'])),
+          tntRequired: this.parseRequiredFlag(this.getFirstValue(normalizedRow, ['TNTRequired'])),
+          insuranceExpiry: this.parseDate(this.getFirstValue(normalizedRow, ['InsuranceExpiry'])),
+          ewofExpiry: this.parseDate(this.getFirstValue(normalizedRow, ['EWOFExpiry'])),
+          tntExpiry: this.parseDate(this.getFirstValue(normalizedRow, ['TNTExpiry'])),
         };
       } catch (error) {
         console.error(`Error parsing row ${index}:`, error);
@@ -139,14 +164,63 @@ export class ExcelService {
       bookingEnteredDate: null,
       customerId: null,
       customerName: null,
+      customerAddressLine1: null,
+      customerAddressLine2: null,
+      customerAddressLine3: null,
+      customerAddressLine4: null,
+      customerAddressLine5: null,
+      customerCountryCode: null,
+      customerPostCode: null,
+      customerCity: null,
+      customerRegion: null,
+      customerDateOfBirth: null,
       vesselId: null,
       vesselName: null,
       serviceStatus: null,
       serviceLineType: null,
+      powerConnectionType: null,
+      ewofRequired: false,
+      tntRequired: false,
       insuranceExpiry: null,
       ewofExpiry: null,
       tntExpiry: null,
     };
+  }
+
+  private normalizeRowKeys(row: any): Record<string, any> {
+    if (!row || typeof row !== 'object') {
+      return {};
+    }
+
+    const normalized: Record<string, any> = {};
+
+    Object.keys(row).forEach((key) => {
+      const value = row[key];
+      const cleanKey = String(key).trim();
+      normalized[cleanKey] = value;
+      normalized[cleanKey.toLowerCase()] = value;
+      normalized[cleanKey.toLowerCase().replace(/\s+/g, '')] = value;
+      normalized[cleanKey.replace(/\s+/g, '')] = value;
+    });
+
+    return normalized;
+  }
+
+  private getFirstValue(row: Record<string, any>, keys: string[]): any {
+    for (const key of keys) {
+      const direct = row[key];
+      if (direct !== undefined && direct !== null && direct !== '') {
+        return direct;
+      }
+
+      const normalizedKey = key.trim().toLowerCase().replace(/\s+/g, '');
+      const match = Object.keys(row).find((candidate) => candidate.trim().toLowerCase().replace(/\s+/g, '') === normalizedKey);
+      if (match !== undefined && row[match] !== undefined && row[match] !== null && row[match] !== '') {
+        return row[match];
+      }
+    }
+
+    return undefined;
   }
 
   private parseNumber(value: any): number {
@@ -179,20 +253,28 @@ export class ExcelService {
     return String(value);
   }
 
+  private parseRequiredFlag(value: any): boolean {
+    if (value === null || value === undefined || value === 'NULL' || value === '') return false;
+    const normalized = String(value).trim().toUpperCase();
+    return ['Y', 'YES', 'TRUE', '1', 'REQUIRED', 'REQ'].includes(normalized);
+  }
+
   private parseDate(value: any): Date | null {
-    if (value === null || value === undefined || value === 'NULL' || value === '') return null;
-    
-    // Handle Excel serial dates
+    if (value === null || value === undefined) return null;
+
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed || ['NULL', 'N/A', 'NA', 'UNKNOWN'].includes(trimmed.toUpperCase())) return null;
+
+      const date = new Date(trimmed);
+      return isNaN(date.getTime()) ? null : date;
+    }
+
     if (typeof value === 'number') {
+      if (!Number.isFinite(value) || value === 0) return null;
       const excelEpoch = new Date(1899, 11, 30);
       const date = new Date(excelEpoch.getTime() + value * 86400000);
       return date;
-    }
-
-    // Handle string dates
-    if (typeof value === 'string') {
-      const date = new Date(value);
-      return isNaN(date.getTime()) ? null : date;
     }
 
     return null;

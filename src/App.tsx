@@ -14,8 +14,11 @@ import VesselComplianceReport from './pages/VesselComplianceReport';
 import LoadingSpinner from './components/LoadingSpinner';
 import ErrorMessage from './components/ErrorMessage';
 import FutureBookings from './pages/FutureBookings';
+import MarinaMap from './pages/MarinaMap';
+import CustomerHeatMap from './pages/CustomerHeatMap';
+import CustomerAgeReport from './pages/CustomerAgeReport';
 
-type Page = 'dashboard' | 'future' | 'future-bookings' | 'monthly' | 'berths' | 'ownership' | 'reports' | 'quality' | 'compliance';
+type Page = 'dashboard' | 'future' | 'future-bookings' | 'marina-map' | 'customer-heatmap' | 'customer-age' | 'monthly' | 'berths' | 'ownership' | 'reports' | 'quality' | 'compliance';
 
 function App() {
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
@@ -86,6 +89,12 @@ function App() {
         return <FutureAvailability allData={data} filters={filters} lastUpdated={lastUpdated} onRefresh={handleRefresh} />;
       case 'future-bookings':
         return <FutureBookings data={filteredData} lastUpdated={lastUpdated} onRefresh={handleRefresh} />;
+      case 'marina-map':
+        return <MarinaMap data={filteredData} lastUpdated={lastUpdated} onRefresh={handleRefresh} />;
+      case 'customer-heatmap':
+        return <CustomerHeatMap data={data} lastUpdated={lastUpdated} onRefresh={handleRefresh} />;
+      case 'customer-age':
+        return <CustomerAgeReport data={data} lastUpdated={lastUpdated} onRefresh={handleRefresh} />;
       case 'monthly':
         return <MonthlyOccupancy data={filteredData} lastUpdated={lastUpdated} onRefresh={handleRefresh} />;
       case 'berths':

@@ -16,7 +16,7 @@ export default function BerthTypeChart({ data }: BerthTypeChartProps) {
       <div className="card-header">
         <h3 className="card-title">Occupancy by Berth Type</h3>
       </div>
-      <ResponsiveContainer width="100%" height={300}>
+      <ResponsiveContainer width="100%" height={360}>
         <PieChart>
           <Pie
             data={typeData}

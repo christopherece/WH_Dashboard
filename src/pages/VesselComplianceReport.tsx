@@ -24,18 +24,22 @@ export default function VesselComplianceReport({ data, lastUpdated, onRefresh }:
     return data
       .filter(record => record.occupancyStatus === 'Rented' && record.vesselName) // Only occupied berths with vessels
       .map(record => {
+        const ewofRequired = Boolean(record.ewofRequired);
+        const tntRequired = Boolean(record.tntRequired);
+
         // Determine compliance status for each field
-        const getComplianceStatus = (expiryDate: Date | null) => {
-          if (!expiryDate) return 'Valid'; // No expiry date means not applicable or valid
+        const getComplianceStatus = (expiryDate: Date | null, isRequired: boolean) => {
+          if (!isRequired) return 'Valid';
+          if (!expiryDate) return 'Expired';
           
           if (expiryDate < today) return 'Expired';
           if (expiryDate <= warningDate) return 'Expiring Soon';
           return 'Valid';
         };
 
-        const insuranceStatus = getComplianceStatus(record.insuranceExpiry);
-        const ewofStatus = getComplianceStatus(record.ewofExpiry);
-        const tntStatus = getComplianceStatus(record.tntExpiry);
+        const insuranceStatus = getComplianceStatus(record.insuranceExpiry, true);
+        const ewofStatus = getComplianceStatus(record.ewofExpiry, ewofRequired);
+        const tntStatus = getComplianceStatus(record.tntExpiry, tntRequired);
 
         // Determine overall compliance
         const hasExpired = insuranceStatus === 'Expired' || ewofStatus === 'Expired' || tntStatus === 'Expired';
@@ -67,6 +71,9 @@ export default function VesselComplianceReport({ data, lastUpdated, onRefresh }:
           berth: record.berth,
           pier: record.pier,
           customerName: record.customerName,
+          powerConnectionType: record.powerConnectionType,
+          ewofRequired,
+          tntRequired,
           insuranceExpiry: record.insuranceExpiry,
           ewofExpiry: record.ewofExpiry,
           tntExpiry: record.tntExpiry,
@@ -429,49 +436,62 @@ export default function VesselComplianceReport({ data, lastUpdated, onRefresh }:
             Showing {displayData.length} of {complianceData.length} vessels
           </p>
         </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vessel</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Berth</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Insurance</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">EWOF</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">TNT</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Overall</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Size Fit</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {displayData.map((item, index) => (
-                <tr key={index} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.vesselName}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.berth} (Pier {item.pier})</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.customerName || '-'}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <div>{formatDate(item.insuranceExpiry)}</div>
-                    <div className="mt-1">{getStatusBadge(item.insuranceStatus)}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <div>{formatDate(item.ewofExpiry)}</div>
-                    <div className="mt-1">{getStatusBadge(item.ewofStatus)}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <div>{formatDate(item.tntExpiry)}</div>
-                    <div className="mt-1">{getStatusBadge(item.tntStatus)}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">{getStatusBadge(item.overallCompliance)}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div>{getStatusBadge(item.sizeCompatibility)}</div>
-                    <div className="text-xs text-gray-400 mt-1">
-                      V: {item.vesselLength}m × {item.vesselWidth}m | B: {item.berthLength}m × {item.berthWidth}m
-                    </div>
-                  </td>
+        <div className="overflow-x-auto overflow-y-hidden rounded-xl border border-slate-200 bg-white shadow-sm" style={{ direction: 'rtl' }}>
+          <div style={{ direction: 'ltr' }}>
+            <table className="min-w-[1200px] divide-y divide-slate-200 text-left">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">Vessel</th>
+                  <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">Berth</th>
+                  <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">Customer</th>
+                  <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">Power</th>
+                  <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">Insurance</th>
+                  <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">EWOF</th>
+                  <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">TNT</th>
+                  <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">Overall</th>
+                  <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">Size Fit</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-200 bg-white">
+                {displayData.map((item, index) => (
+                  <tr key={index} className="transition-colors hover:bg-slate-50">
+                    <td className="px-5 py-4 whitespace-nowrap text-sm font-semibold text-slate-900">{item.vesselName}</td>
+                    <td className="px-5 py-4 whitespace-nowrap text-sm text-slate-600">{item.berth} (Pier {item.pier})</td>
+                    <td className="px-5 py-4 whitespace-nowrap text-sm text-slate-600">{item.customerName || '-'}</td>
+                    <td className="px-5 py-4 whitespace-nowrap text-sm text-slate-600">
+                      <div className="font-semibold text-slate-900">{item.powerConnectionType || 'N/A'}</div>
+                      <div className="mt-1 text-xs text-slate-400">
+                        {item.ewofRequired && item.tntRequired ? 'EWOF + TNT' : item.tntRequired ? 'TNT only' : 'None required'}
+                      </div>
+                    </td>
+                    <td className="px-5 py-4 whitespace-nowrap text-sm text-slate-600">
+                      <div>{formatDate(item.insuranceExpiry)}</div>
+                      <div className="mt-1">{getStatusBadge(item.insuranceStatus)}</div>
+                    </td>
+                    <td className="px-5 py-4 whitespace-nowrap text-sm text-slate-600">
+                      <div>{formatDate(item.ewofExpiry)}</div>
+                      <div className="mt-1">
+                        {item.ewofRequired ? getStatusBadge(item.ewofStatus) : <span className="badge badge-secondary">Not Required</span>}
+                      </div>
+                    </td>
+                    <td className="px-5 py-4 whitespace-nowrap text-sm text-slate-600">
+                      <div>{formatDate(item.tntExpiry)}</div>
+                      <div className="mt-1">
+                        {item.tntRequired ? getStatusBadge(item.tntStatus) : <span className="badge badge-secondary">Not Required</span>}
+                      </div>
+                    </td>
+                    <td className="px-5 py-4 whitespace-nowrap">{getStatusBadge(item.overallCompliance)}</td>
+                    <td className="px-5 py-4 whitespace-nowrap">
+                      <div>{getStatusBadge(item.sizeCompatibility)}</div>
+                      <div className="mt-1 text-xs text-slate-400">
+                        V: {item.vesselLength}m × {item.vesselWidth}m | B: {item.berthLength}m × {item.berthWidth}m
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
         {displayData.length === 0 && (
           <div className="p-8 text-center text-gray-500">
