@@ -1,0 +1,484 @@
+import { useState, useMemo } from 'react';
+import { BerthRecord, VesselCompliance } from '../types/berth';
+
+interface VesselComplianceReportProps {
+  data: BerthRecord[];
+  lastUpdated: Date | null;
+  onRefresh: () => void;
+}
+
+export default function VesselComplianceReport({ data, lastUpdated, onRefresh }: VesselComplianceReportProps) {
+  const [showAll, setShowAll] = useState(false);
+  const [warningDays, setWarningDays] = useState(30); // Days before expiry to show as warning
+  const [complianceFilter, setComplianceFilter] = useState<'all' | 'compliant' | 'warning' | 'non-compliant'>('all');
+  const [sizeFilter, setSizeFilter] = useState<'all' | 'compatible' | 'over-size' | 'under-size'>('all');
+  const [insuranceFilter, setInsuranceFilter] = useState<'all' | 'valid' | 'expiring-soon' | 'expired'>('all');
+  const [ewofFilter, setEwofFilter] = useState<'all' | 'valid' | 'expiring-soon' | 'expired'>('all');
+  const [tntFilter, setTntFilter] = useState<'all' | 'valid' | 'expiring-soon' | 'expired'>('all');
+
+  const complianceData = useMemo(() => {
+    const today = new Date();
+    const warningDate = new Date();
+    warningDate.setDate(today.getDate() + warningDays);
+
+    return data
+      .filter(record => record.occupancyStatus === 'Rented' && record.vesselName) // Only occupied berths with vessels
+      .map(record => {
+        // Determine compliance status for each field
+        const getComplianceStatus = (expiryDate: Date | null) => {
+          if (!expiryDate) return 'Valid'; // No expiry date means not applicable or valid
+          
+          if (expiryDate < today) return 'Expired';
+          if (expiryDate <= warningDate) return 'Expiring Soon';
+          return 'Valid';
+        };
+
+        const insuranceStatus = getComplianceStatus(record.insuranceExpiry);
+        const ewofStatus = getComplianceStatus(record.ewofExpiry);
+        const tntStatus = getComplianceStatus(record.tntExpiry);
+
+        // Determine overall compliance
+        const hasExpired = insuranceStatus === 'Expired' || ewofStatus === 'Expired' || tntStatus === 'Expired';
+        const hasWarning = insuranceStatus === 'Expiring Soon' || ewofStatus === 'Expiring Soon' || tntStatus === 'Expiring Soon';
+        
+        let overallCompliance: 'Compliant' | 'Warning' | 'Non-Compliant';
+        if (hasExpired) overallCompliance = 'Non-Compliant';
+        else if (hasWarning) overallCompliance = 'Warning';
+        else overallCompliance = 'Compliant';
+
+        // Size compatibility check
+        const vesselLength = record.actualLength || record.nominalLength;
+        const vesselWidth = record.actualWidth || record.nominalWidth;
+        const berthLength = record.nominalLength;
+        const berthWidth = record.nominalWidth;
+
+        let sizeCompatibility: 'Compatible' | 'Over Size' | 'Under Size';
+        if (vesselLength > berthLength || vesselWidth > berthWidth) {
+          sizeCompatibility = 'Over Size';
+        } else if (vesselLength < berthLength * 0.7 || vesselWidth < berthWidth * 0.7) {
+          sizeCompatibility = 'Under Size';
+        } else {
+          sizeCompatibility = 'Compatible';
+        }
+
+        return {
+          vesselId: record.vesselId,
+          vesselName: record.vesselName,
+          berth: record.berth,
+          pier: record.pier,
+          customerName: record.customerName,
+          insuranceExpiry: record.insuranceExpiry,
+          ewofExpiry: record.ewofExpiry,
+          tntExpiry: record.tntExpiry,
+          insuranceStatus,
+          ewofStatus,
+          tntStatus,
+          overallCompliance,
+          sizeCompatibility,
+          vesselLength,
+          vesselWidth,
+          berthLength,
+          berthWidth,
+        };
+      });
+  }, [data, warningDays]);
+
+  // Summary statistics
+  const stats = useMemo(() => {
+    const total = complianceData.length;
+    const compliant = complianceData.filter(c => c.overallCompliance === 'Compliant').length;
+    const warning = complianceData.filter(c => c.overallCompliance === 'Warning').length;
+    const nonCompliant = complianceData.filter(c => c.overallCompliance === 'Non-Compliant').length;
+    
+    const compatible = complianceData.filter(c => c.sizeCompatibility === 'Compatible').length;
+    const overSize = complianceData.filter(c => c.sizeCompatibility === 'Over Size').length;
+    const underSize = complianceData.filter(c => c.sizeCompatibility === 'Under Size').length;
+
+    return { total, compliant, warning, nonCompliant, compatible, overSize, underSize };
+  }, [complianceData]);
+
+  // Filter data based on multiple criteria
+  const displayData = useMemo(() => {
+    let filtered = complianceData;
+
+    // Apply show all vs issues only filter
+    if (!showAll) {
+      filtered = filtered.filter(c => c.overallCompliance !== 'Compliant');
+    }
+
+    // Apply compliance status filter
+    if (complianceFilter !== 'all') {
+      filtered = filtered.filter(c => {
+        switch (complianceFilter) {
+          case 'compliant': return c.overallCompliance === 'Compliant';
+          case 'warning': return c.overallCompliance === 'Warning';
+          case 'non-compliant': return c.overallCompliance === 'Non-Compliant';
+          default: return true;
+        }
+      });
+    }
+
+    // Apply size compatibility filter
+    if (sizeFilter !== 'all') {
+      filtered = filtered.filter(c => {
+        switch (sizeFilter) {
+          case 'compatible': return c.sizeCompatibility === 'Compatible';
+          case 'over-size': return c.sizeCompatibility === 'Over Size';
+          case 'under-size': return c.sizeCompatibility === 'Under Size';
+          default: return true;
+        }
+      });
+    }
+
+    // Apply insurance filter
+    if (insuranceFilter !== 'all') {
+      filtered = filtered.filter(c => {
+        switch (insuranceFilter) {
+          case 'valid': return c.insuranceStatus === 'Valid';
+          case 'expiring-soon': return c.insuranceStatus === 'Expiring Soon';
+          case 'expired': return c.insuranceStatus === 'Expired';
+          default: return true;
+        }
+      });
+    }
+
+    // Apply EWOF filter
+    if (ewofFilter !== 'all') {
+      filtered = filtered.filter(c => {
+        switch (ewofFilter) {
+          case 'valid': return c.ewofStatus === 'Valid';
+          case 'expiring-soon': return c.ewofStatus === 'Expiring Soon';
+          case 'expired': return c.ewofStatus === 'Expired';
+          default: return true;
+        }
+      });
+    }
+
+    // Apply TNT filter
+    if (tntFilter !== 'all') {
+      filtered = filtered.filter(c => {
+        switch (tntFilter) {
+          case 'valid': return c.tntStatus === 'Valid';
+          case 'expiring-soon': return c.tntStatus === 'Expiring Soon';
+          case 'expired': return c.tntStatus === 'Expired';
+          default: return true;
+        }
+      });
+    }
+
+    return filtered;
+  }, [complianceData, showAll, complianceFilter, sizeFilter, insuranceFilter, ewofFilter, tntFilter]);
+
+  // Filtered statistics
+  const filteredStats = useMemo(() => {
+    const total = displayData.length;
+    const compliant = displayData.filter(c => c.overallCompliance === 'Compliant').length;
+    const warning = displayData.filter(c => c.overallCompliance === 'Warning').length;
+    const nonCompliant = displayData.filter(c => c.overallCompliance === 'Non-Compliant').length;
+    
+    const compatible = displayData.filter(c => c.sizeCompatibility === 'Compatible').length;
+    const overSize = displayData.filter(c => c.sizeCompatibility === 'Over Size').length;
+    const underSize = displayData.filter(c => c.sizeCompatibility === 'Under Size').length;
+
+    return { total, compliant, warning, nonCompliant, compatible, overSize, underSize };
+  }, [displayData]);
+
+  const formatDate = (date: Date | null) => {
+    if (!date) return 'N/A';
+    return date.toLocaleDateString('en-NZ');
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'Valid':
+      case 'Compliant':
+      case 'Compatible':
+        return <span className="badge badge-success">{status}</span>;
+      case 'Expiring Soon':
+      case 'Warning':
+      case 'Under Size':
+        return <span className="badge badge-warning">{status}</span>;
+      case 'Expired':
+      case 'Non-Compliant':
+      case 'Over Size':
+        return <span className="badge badge-danger">{status}</span>;
+      default:
+        return <span className="badge badge-info">{status}</span>;
+    }
+  };
+
+  const formatLastUpdated = () => {
+    if (!lastUpdated) return 'Unknown';
+    return lastUpdated.toLocaleString('en-NZ', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Vessel Compliance Report</h1>
+          <p className="text-sm text-gray-600 mt-1">
+            Data Last Updated: {formatLastUpdated()}
+          </p>
+        </div>
+        <button
+          onClick={onRefresh}
+          className="btn btn-secondary"
+        >
+          Refresh Data
+        </button>
+      </div>
+
+      {/* Summary Statistics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="card">
+          <div className="p-4">
+            <p className="text-sm text-gray-600">Total Vessels</p>
+            <p className="text-2xl font-bold text-gray-900">{filteredStats.total}</p>
+            <p className="text-xs text-gray-400">of {stats.total} total</p>
+          </div>
+        </div>
+        <div className="card">
+          <div className="p-4">
+            <p className="text-sm text-gray-600">Compliant</p>
+            <p className="text-2xl font-bold text-green-600">{filteredStats.compliant}</p>
+            <p className="text-xs text-gray-400">of {stats.compliant} total</p>
+          </div>
+        </div>
+        <div className="card">
+          <div className="p-4">
+            <p className="text-sm text-gray-600">Warning</p>
+            <p className="text-2xl font-bold text-yellow-600">{filteredStats.warning}</p>
+            <p className="text-xs text-gray-400">of {stats.warning} total</p>
+          </div>
+        </div>
+        <div className="card">
+          <div className="p-4">
+            <p className="text-sm text-gray-600">Non-Compliant</p>
+            <p className="text-2xl font-bold text-red-600">{filteredStats.nonCompliant}</p>
+            <p className="text-xs text-gray-400">of {stats.nonCompliant} total</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Size Compatibility Statistics */}
+      <div className="card">
+        <div className="card-header">
+          <h3 className="card-title">Size Compatibility Overview</h3>
+        </div>
+        <div className="grid grid-cols-3 gap-4 p-4">
+          <div className="text-center">
+            <p className="text-sm text-gray-600">Compatible</p>
+            <p className="text-xl font-bold text-green-600">{filteredStats.compatible}</p>
+            <p className="text-xs text-gray-400">of {stats.compatible} total</p>
+          </div>
+          <div className="text-center">
+            <p className="text-sm text-gray-600">Over Size</p>
+            <p className="text-xl font-bold text-red-600">{filteredStats.overSize}</p>
+            <p className="text-xs text-gray-400">of {stats.overSize} total</p>
+          </div>
+          <div className="text-center">
+            <p className="text-sm text-gray-600">Under Size</p>
+            <p className="text-xl font-bold text-yellow-600">{filteredStats.underSize}</p>
+            <p className="text-xs text-gray-400">of {stats.underSize} total</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Controls */}
+      <div className="card">
+        <div className="card-header flex justify-between items-center">
+          <h3 className="card-title">Filter Options</h3>
+        </div>
+        <div className="p-4 space-y-4">
+          <div className="flex flex-wrap gap-4 items-center">
+            <label className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                checked={showAll}
+                onChange={(e) => setShowAll(e.target.checked)}
+                className="form-checkbox"
+              />
+              <span className="text-sm text-gray-700">Show All Vessels</span>
+            </label>
+            <div className="flex items-center space-x-2">
+              <label className="text-sm text-gray-700">Warning Period (days):</label>
+              <input
+                type="number"
+                value={warningDays}
+                onChange={(e) => setWarningDays(Number(e.target.value))}
+                className="input w-24"
+                min="1"
+                max="365"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Overall Compliance Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Overall Compliance</label>
+              <select
+                value={complianceFilter}
+                onChange={(e) => setComplianceFilter(e.target.value as any)}
+                className="select"
+              >
+                <option value="all">All Status</option>
+                <option value="compliant">Compliant</option>
+                <option value="warning">Warning</option>
+                <option value="non-compliant">Non-Compliant</option>
+              </select>
+            </div>
+
+            {/* Size Compatibility Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Size Compatibility</label>
+              <select
+                value={sizeFilter}
+                onChange={(e) => setSizeFilter(e.target.value as any)}
+                className="select"
+              >
+                <option value="all">All Sizes</option>
+                <option value="compatible">Compatible</option>
+                <option value="over-size">Over Size</option>
+                <option value="under-size">Under Size</option>
+              </select>
+            </div>
+
+            {/* Insurance Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Insurance Status</label>
+              <select
+                value={insuranceFilter}
+                onChange={(e) => setInsuranceFilter(e.target.value as any)}
+                className="select"
+              >
+                <option value="all">All Status</option>
+                <option value="valid">Valid</option>
+                <option value="expiring-soon">Expiring Soon</option>
+                <option value="expired">Expired</option>
+              </select>
+            </div>
+
+            {/* EWOF Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">EWOF Status</label>
+              <select
+                value={ewofFilter}
+                onChange={(e) => setEwofFilter(e.target.value as any)}
+                className="select"
+              >
+                <option value="all">All Status</option>
+                <option value="valid">Valid</option>
+                <option value="expiring-soon">Expiring Soon</option>
+                <option value="expired">Expired</option>
+              </select>
+            </div>
+
+            {/* TNT Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">TNT Status</label>
+              <select
+                value={tntFilter}
+                onChange={(e) => setTntFilter(e.target.value as any)}
+                className="select"
+              >
+                <option value="all">All Status</option>
+                <option value="valid">Valid</option>
+                <option value="expiring-soon">Expiring Soon</option>
+                <option value="expired">Expired</option>
+              </select>
+            </div>
+
+            {/* Clear Filters Button */}
+            <div className="flex items-end">
+              <button
+                onClick={() => {
+                  setComplianceFilter('all');
+                  setSizeFilter('all');
+                  setInsuranceFilter('all');
+                  setEwofFilter('all');
+                  setTntFilter('all');
+                }}
+                className="btn btn-secondary w-full"
+              >
+                Clear Filters
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Compliance Table */}
+      <div className="card">
+        <div className="card-header">
+          <h3 className="card-title">
+            Vessel Compliance Details
+            {(!showAll || complianceFilter !== 'all' || sizeFilter !== 'all' || 
+              insuranceFilter !== 'all' || ewofFilter !== 'all' || tntFilter !== 'all') && 
+              ' (Filtered)'}
+          </h3>
+          <p className="text-sm text-gray-600">
+            Showing {displayData.length} of {complianceData.length} vessels
+          </p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vessel</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Berth</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Insurance</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">EWOF</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">TNT</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Overall</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Size Fit</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {displayData.map((item, index) => (
+                <tr key={index} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.vesselName}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.berth} (Pier {item.pier})</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.customerName || '-'}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <div>{formatDate(item.insuranceExpiry)}</div>
+                    <div className="mt-1">{getStatusBadge(item.insuranceStatus)}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <div>{formatDate(item.ewofExpiry)}</div>
+                    <div className="mt-1">{getStatusBadge(item.ewofStatus)}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <div>{formatDate(item.tntExpiry)}</div>
+                    <div className="mt-1">{getStatusBadge(item.tntStatus)}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">{getStatusBadge(item.overallCompliance)}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div>{getStatusBadge(item.sizeCompatibility)}</div>
+                    <div className="text-xs text-gray-400 mt-1">
+                      V: {item.vesselLength}m × {item.vesselWidth}m | B: {item.berthLength}m × {item.berthWidth}m
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {displayData.length === 0 && (
+          <div className="p-8 text-center text-gray-500">
+            No vessels found matching the current filter criteria.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
