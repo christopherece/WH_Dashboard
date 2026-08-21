@@ -48,7 +48,17 @@ export default function ManagementSummary({ data, metrics }: ManagementSummaryPr
         </div>
       </div>
 
-      <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="mt-5 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div className="rounded-xl border border-violet-200 bg-violet-50 p-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-violet-700">Vessel Compliance</p>
+          <p className="mt-2 text-2xl font-bold text-violet-700">{metrics.vesselComplianceRate.toFixed(1)}%</p>
+        </div>
+
+        <div className="rounded-xl border border-cyan-200 bg-cyan-50 p-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-cyan-700">Average Age</p>
+          <p className="mt-2 text-2xl font-bold text-cyan-700">{metrics.averageAge ? `${metrics.averageAge.toFixed(1)} yrs` : 'N/A'}</p>
+        </div>
+
         {highestOccupancyPier && (
           <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
             <p className="text-xs font-medium uppercase tracking-wide text-emerald-700">Highest Occupancy Pier</p>

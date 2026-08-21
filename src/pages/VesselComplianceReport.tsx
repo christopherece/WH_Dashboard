@@ -226,9 +226,9 @@ export default function VesselComplianceReport({ data, lastUpdated, onRefresh }:
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="w-full p-4 sm:p-6 space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-start">
+      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Vessel Compliance Report</h1>
           <p className="text-sm text-gray-600 mt-1">
@@ -237,14 +237,14 @@ export default function VesselComplianceReport({ data, lastUpdated, onRefresh }:
         </div>
         <button
           onClick={onRefresh}
-          className="btn btn-secondary"
+          className="btn btn-secondary w-full sm:w-auto"
         >
           Refresh Data
         </button>
       </div>
 
       {/* Summary Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <div className="card">
           <div className="p-4">
             <p className="text-sm text-gray-600">Total Vessels</p>
@@ -280,7 +280,7 @@ export default function VesselComplianceReport({ data, lastUpdated, onRefresh }:
         <div className="card-header">
           <h3 className="card-title">Size Compatibility Overview</h3>
         </div>
-        <div className="grid grid-cols-3 gap-4 p-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4">
           <div className="text-center">
             <p className="text-sm text-gray-600">Compatible</p>
             <p className="text-xl font-bold text-green-600">{filteredStats.compatible}</p>
@@ -328,7 +328,7 @@ export default function VesselComplianceReport({ data, lastUpdated, onRefresh }:
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {/* Overall Compliance Filter */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Overall Compliance</label>
@@ -424,7 +424,7 @@ export default function VesselComplianceReport({ data, lastUpdated, onRefresh }:
       </div>
 
       {/* Compliance Table */}
-      <div className="card">
+      <div className="card w-full">
         <div className="card-header">
           <h3 className="card-title">
             Vessel Compliance Details
@@ -436,62 +436,60 @@ export default function VesselComplianceReport({ data, lastUpdated, onRefresh }:
             Showing {displayData.length} of {complianceData.length} vessels
           </p>
         </div>
-        <div className="overflow-x-auto overflow-y-hidden rounded-xl border border-slate-200 bg-white shadow-sm" style={{ direction: 'rtl' }}>
-          <div style={{ direction: 'ltr' }}>
-            <table className="min-w-[1200px] divide-y divide-slate-200 text-left">
-              <thead className="bg-slate-50">
-                <tr>
-                  <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">Vessel</th>
-                  <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">Berth</th>
-                  <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">Customer</th>
-                  <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">Power</th>
-                  <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">Insurance</th>
-                  <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">EWOF</th>
-                  <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">TNT</th>
-                  <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">Overall</th>
-                  <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">Size Fit</th>
+        <div className="w-full overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+          <table className="min-w-[1100px] w-full table-fixed divide-y divide-slate-200 text-left">
+            <thead className="bg-slate-50">
+              <tr>
+                <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600 sm:px-4">Vessel</th>
+                <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600 sm:px-4">Berth</th>
+                <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600 sm:px-4">Customer</th>
+                <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600 sm:px-4">Power</th>
+                <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600 sm:px-4">Insurance</th>
+                <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600 sm:px-4">EWOF</th>
+                <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600 sm:px-4">TNT</th>
+                <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600 sm:px-4">Overall</th>
+                <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600 sm:px-4">Size Fit</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200 bg-white">
+              {displayData.map((item, index) => (
+                <tr key={index} className="align-top transition-colors hover:bg-slate-50">
+                  <td className="px-3 py-4 text-sm font-semibold text-slate-900 sm:px-4">{item.vesselName}</td>
+                  <td className="px-3 py-4 text-sm text-slate-600 sm:px-4">{item.berth} (Pier {item.pier})</td>
+                  <td className="px-3 py-4 text-sm text-slate-600 sm:px-4">{item.customerName || '-'}</td>
+                  <td className="px-3 py-4 text-sm text-slate-600 sm:px-4">
+                    <div className="font-semibold text-slate-900">{item.powerConnectionType || 'N/A'}</div>
+                    <div className="mt-1 text-[11px] text-slate-400">
+                      {item.ewofRequired && item.tntRequired ? 'EWOF + TNT' : item.tntRequired ? 'TNT only' : 'None required'}
+                    </div>
+                  </td>
+                  <td className="px-3 py-4 text-sm text-slate-600 sm:px-4">
+                    <div>{formatDate(item.insuranceExpiry)}</div>
+                    <div className="mt-1">{getStatusBadge(item.insuranceStatus)}</div>
+                  </td>
+                  <td className="px-3 py-4 text-sm text-slate-600 sm:px-4">
+                    <div>{formatDate(item.ewofExpiry)}</div>
+                    <div className="mt-1">
+                      {item.ewofRequired ? getStatusBadge(item.ewofStatus) : <span className="badge badge-info">Not Required</span>}
+                    </div>
+                  </td>
+                  <td className="px-3 py-4 text-sm text-slate-600 sm:px-4">
+                    <div>{formatDate(item.tntExpiry)}</div>
+                    <div className="mt-1">
+                      {item.tntRequired ? getStatusBadge(item.tntStatus) : <span className="badge badge-info">Not Required</span>}
+                    </div>
+                  </td>
+                  <td className="px-3 py-4 sm:px-4">{getStatusBadge(item.overallCompliance)}</td>
+                  <td className="px-3 py-4 text-sm text-slate-600 sm:px-4">
+                    <div>{getStatusBadge(item.sizeCompatibility)}</div>
+                    <div className="mt-1 break-words text-[11px] text-slate-400">
+                      V: {item.vesselLength}m × {item.vesselWidth}m | B: {item.berthLength}m × {item.berthWidth}m
+                    </div>
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200 bg-white">
-                {displayData.map((item, index) => (
-                  <tr key={index} className="transition-colors hover:bg-slate-50">
-                    <td className="px-5 py-4 whitespace-nowrap text-sm font-semibold text-slate-900">{item.vesselName}</td>
-                    <td className="px-5 py-4 whitespace-nowrap text-sm text-slate-600">{item.berth} (Pier {item.pier})</td>
-                    <td className="px-5 py-4 whitespace-nowrap text-sm text-slate-600">{item.customerName || '-'}</td>
-                    <td className="px-5 py-4 whitespace-nowrap text-sm text-slate-600">
-                      <div className="font-semibold text-slate-900">{item.powerConnectionType || 'N/A'}</div>
-                      <div className="mt-1 text-xs text-slate-400">
-                        {item.ewofRequired && item.tntRequired ? 'EWOF + TNT' : item.tntRequired ? 'TNT only' : 'None required'}
-                      </div>
-                    </td>
-                    <td className="px-5 py-4 whitespace-nowrap text-sm text-slate-600">
-                      <div>{formatDate(item.insuranceExpiry)}</div>
-                      <div className="mt-1">{getStatusBadge(item.insuranceStatus)}</div>
-                    </td>
-                    <td className="px-5 py-4 whitespace-nowrap text-sm text-slate-600">
-                      <div>{formatDate(item.ewofExpiry)}</div>
-                      <div className="mt-1">
-                        {item.ewofRequired ? getStatusBadge(item.ewofStatus) : <span className="badge badge-secondary">Not Required</span>}
-                      </div>
-                    </td>
-                    <td className="px-5 py-4 whitespace-nowrap text-sm text-slate-600">
-                      <div>{formatDate(item.tntExpiry)}</div>
-                      <div className="mt-1">
-                        {item.tntRequired ? getStatusBadge(item.tntStatus) : <span className="badge badge-secondary">Not Required</span>}
-                      </div>
-                    </td>
-                    <td className="px-5 py-4 whitespace-nowrap">{getStatusBadge(item.overallCompliance)}</td>
-                    <td className="px-5 py-4 whitespace-nowrap">
-                      <div>{getStatusBadge(item.sizeCompatibility)}</div>
-                      <div className="mt-1 text-xs text-slate-400">
-                        V: {item.vesselLength}m × {item.vesselWidth}m | B: {item.berthLength}m × {item.berthWidth}m
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
         </div>
         {displayData.length === 0 && (
           <div className="p-8 text-center text-gray-500">

@@ -19,7 +19,7 @@
 
 @layer components {
   .dashboard-shell {
-    @apply p-6 md:p-8 space-y-6;
+    @apply p-4 md:p-6 space-y-4;
   }
 
   .page-header {
@@ -35,7 +35,7 @@
   }
 
   .card {
-    @apply bg-white rounded-2xl shadow-sm border border-slate-200 p-6;
+    @apply bg-white rounded-2xl shadow-sm border border-slate-200 p-4;
   }
   
   .card-header {

@@ -42,23 +42,21 @@ export default function OccupancyGauge({ occupancy }: OccupancyGaugeProps) {
   ];
 
   return (
-    <div className="card">
-      <div className="card-header">
-        <h3 className="card-title">Occupancy Rate</h3>
-      </div>
+    <div className="w-full rounded-2xl bg-white p-2">
       <div className="flex items-center justify-center">
         <div className="relative">
-          <ResponsiveContainer width={200} height={200}>
+          <ResponsiveContainer width={240} height={240}>
             <PieChart>
               <Pie
                 data={data}
                 cx="50%"
                 cy="50%"
-                innerRadius={60}
-                outerRadius={80}
+                innerRadius={72}
+                outerRadius={96}
                 startAngle={90}
                 endAngle={-270}
                 dataKey="value"
+                stroke="transparent"
               >
                 {data.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={entry.color} />
@@ -68,23 +66,23 @@ export default function OccupancyGauge({ occupancy }: OccupancyGaugeProps) {
             </PieChart>
           </ResponsiveContainer>
           <div className="absolute inset-0 flex items-center justify-center flex-col">
-            <span className="text-3xl font-bold text-gray-900">{occupancy.toFixed(1)}%</span>
+            <span className="text-4xl font-bold text-gray-900">{occupancy.toFixed(1)}%</span>
             <span className="text-sm text-gray-600">{getOccupancyLabel()}</span>
           </div>
         </div>
       </div>
-      <div className="mt-4 flex justify-center space-x-6 text-sm">
+      <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-gray-600">
         <div className="flex items-center">
-          <div className="w-3 h-3 rounded-full bg-green-500 mr-2"></div>
-          <span className="text-gray-600">0-60%: Healthy</span>
+          <div className="w-2.5 h-2.5 rounded-full bg-green-500 mr-2"></div>
+          <span>Healthy</span>
         </div>
         <div className="flex items-center">
-          <div className="w-3 h-3 rounded-full bg-yellow-500 mr-2"></div>
-          <span className="text-gray-600">60-80%: Moderate</span>
+          <div className="w-2.5 h-2.5 rounded-full bg-yellow-500 mr-2"></div>
+          <span>Moderate</span>
         </div>
         <div className="flex items-center">
-          <div className="w-3 h-3 rounded-full bg-red-500 mr-2"></div>
-          <span className="text-gray-600">80%+: High</span>
+          <div className="w-2.5 h-2.5 rounded-full bg-red-500 mr-2"></div>
+          <span>High</span>
         </div>
       </div>
     </div>

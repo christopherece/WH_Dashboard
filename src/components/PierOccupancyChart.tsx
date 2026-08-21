@@ -21,9 +21,9 @@ export default function PierOccupancyChart({ data }: PierOccupancyChartProps) {
         </div>
       </div>
 
-      <div className="h-[380px] w-full">
+      <div className="h-[560px] w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={pierData} layout="vertical" margin={{ top: 8, right: 20, left: 8, bottom: 8 }}>
+          <BarChart data={pierData} layout="vertical" margin={{ top: 10, right: 18, left: 6, bottom: 10 }}>
             <CartesianGrid strokeDasharray="4 4" stroke="#e2e8f0" horizontal={false} />
             <XAxis
               type="number"
@@ -36,7 +36,7 @@ export default function PierOccupancyChart({ data }: PierOccupancyChartProps) {
               type="category"
               tickFormatter={(value) => `Pier ${value}`}
               tick={{ fill: '#475569', fontSize: 12 }}
-              width={60}
+              width={90}
               axisLine={{ stroke: '#cbd5e1' }}
               tickLine={false}
             />

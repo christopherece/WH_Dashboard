@@ -25,18 +25,69 @@ export function calculateKPIMetrics(data: BerthRecord[]): KPIMetrics {
       booked: 0,
       available: 0,
       occupancyPercentage: 0,
+      vesselComplianceRate: 0,
+      averageAge: 0,
     };
   }
 
   const activeBerths = data.filter(r => r.berthStatus === 'Active');
   const totalActiveBerths = activeBerths.length;
-  
+
   const occupied = activeBerths.filter(r => r.occupancyStatus === 'Rented').length;
   const booked = activeBerths.filter(r => r.occupancyStatus === 'Booked').length;
   const available = activeBerths.filter(r => r.occupancyStatus === 'Available').length;
-  
-  const occupancyPercentage = totalActiveBerths > 0 
-    ? ((occupied + booked) / totalActiveBerths) * 100 
+
+  const occupancyPercentage = totalActiveBerths > 0
+    ? ((occupied + booked) / totalActiveBerths) * 100
+    : 0;
+
+  const vesselRecords = data.filter(r => r.occupancyStatus === 'Rented' && r.vesselName);
+  const compliantVessels = vesselRecords.filter((record) => {
+    const today = new Date();
+    const warningDate = new Date();
+    warningDate.setDate(today.getDate() + 30);
+
+    const getStatus = (expiryDate: Date | null, isRequired: boolean) => {
+      if (!isRequired) return 'Valid';
+      if (!expiryDate) return 'Expired';
+      if (expiryDate < today) return 'Expired';
+      if (expiryDate <= warningDate) return 'Expiring Soon';
+      return 'Valid';
+    };
+
+    const insuranceStatus = getStatus(record.insuranceExpiry, true);
+    const ewofStatus = getStatus(record.ewofExpiry, Boolean(record.ewofRequired));
+    const tntStatus = getStatus(record.tntExpiry, Boolean(record.tntRequired));
+
+    const hasExpired = insuranceStatus === 'Expired' || ewofStatus === 'Expired' || tntStatus === 'Expired';
+    const hasWarning = insuranceStatus === 'Expiring Soon' || ewofStatus === 'Expiring Soon' || tntStatus === 'Expiring Soon';
+
+    return !hasExpired && !hasWarning;
+  }).length;
+
+  const vesselComplianceRate = vesselRecords.length > 0
+    ? (compliantVessels / vesselRecords.length) * 100
+    : 0;
+
+  const validAges = data
+    .map((record) => {
+      const dob = record.customerDateOfBirth;
+      if (!dob || Number.isNaN(dob.getTime())) return null;
+
+      const today = new Date();
+      let age = today.getFullYear() - dob.getFullYear();
+      const monthDiff = today.getMonth() - dob.getMonth();
+
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+        age -= 1;
+      }
+
+      return age;
+    })
+    .filter((age): age is number => age !== null && age >= 20);
+
+  const averageAge = validAges.length > 0
+    ? validAges.reduce((sum, age) => sum + age, 0) / validAges.length
     : 0;
 
   return {
@@ -45,6 +96,8 @@ export function calculateKPIMetrics(data: BerthRecord[]): KPIMetrics {
     booked,
     available,
     occupancyPercentage: Math.round(occupancyPercentage * 10) / 10,
+    vesselComplianceRate: Math.round(vesselComplianceRate * 10) / 10,
+    averageAge: validAges.length > 0 ? Number(averageAge.toFixed(1)) : 0,
   };
 }
 

@@ -27,18 +27,20 @@ export default function BerthTypeChart({ data }: BerthTypeChartProps) {
             outerRadius={80}
             fill="#8884d8"
             dataKey="totalBerths"
+            nameKey="berthType"
           >
             {typeData.map((entry, index) => (
               <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
             ))}
           </Pie>
           <Tooltip
-            formatter={(value: any, name: string) => {
+            formatter={(value: any, name: string, item: any) => {
+              const berthType = item?.payload?.berthType ?? 'Berth Type';
               if (name === 'occupancyPercentage') return [`${value.toFixed(1)}%`, 'Occupancy'];
-              return [value, name];
+              return [value, berthType];
             }}
           />
-          <Legend />
+          <Legend formatter={(value) => value} />
         </PieChart>
       </ResponsiveContainer>
     </div>

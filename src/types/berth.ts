@@ -67,6 +67,8 @@ export interface KPIMetrics {
   booked: number;
   available: number;
   occupancyPercentage: number;
+  vesselComplianceRate: number;
+  averageAge: number;
 }
 
 export interface DataQualityReport {

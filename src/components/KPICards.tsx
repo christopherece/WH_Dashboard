@@ -2,11 +2,9 @@ import { KPIMetrics } from '../types/berth';
 
 interface KPICardsProps {
   metrics: KPIMetrics;
-  averageCustomerAge?: number | null;
-  customersWithDob?: number;
 }
 
-export default function KPICards({ metrics, averageCustomerAge, customersWithDob = 0 }: KPICardsProps) {
+export default function KPICards({ metrics }: KPICardsProps) {
   const cards = [
     {
       title: 'Total Active Berths',
@@ -43,17 +41,10 @@ export default function KPICards({ metrics, averageCustomerAge, customersWithDob
       accent: 'from-sky-500 to-blue-600',
       iconClass: 'bg-sky-100 text-sky-700',
     },
-    {
-      title: 'Avg Customer Age',
-      value: averageCustomerAge !== null && averageCustomerAge !== undefined ? `${averageCustomerAge} yrs` : 'N/A',
-      icon: '👥',
-      accent: 'from-violet-500 to-indigo-600',
-      iconClass: 'bg-violet-100 text-violet-700',
-    },
   ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
       {cards.map((card) => (
         <div
           key={card.title}
@@ -64,9 +55,6 @@ export default function KPICards({ metrics, averageCustomerAge, customersWithDob
             <div>
               <p className="text-sm font-medium text-slate-500">{card.title}</p>
               <p className="mt-3 text-3xl font-bold tracking-tight text-slate-900">{card.value}</p>
-              {card.title === 'Avg Customer Age' && (
-                <p className="mt-2 text-xs text-slate-500">{customersWithDob} with DOB</p>
-              )}
             </div>
             <div className={`flex h-11 w-11 items-center justify-center rounded-xl text-lg font-semibold ${card.iconClass}`}>
               {card.icon}
