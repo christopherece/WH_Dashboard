@@ -24,6 +24,8 @@ export function calculateKPIMetrics(data: BerthRecord[]): KPIMetrics {
       occupied: 0,
       booked: 0,
       available: 0,
+      futureBookings: 0,
+      futureRentals: 0,
       occupancyPercentage: 0,
       vesselComplianceRate: 0,
       averageAge: 0,
@@ -36,6 +38,8 @@ export function calculateKPIMetrics(data: BerthRecord[]): KPIMetrics {
   const occupied = activeBerths.filter(r => r.occupancyStatus === 'Rented').length;
   const booked = activeBerths.filter(r => r.occupancyStatus === 'Booked').length;
   const available = activeBerths.filter(r => r.occupancyStatus === 'Available').length;
+  const futureBookings = activeBerths.filter(r => r.occupancyStatus === 'Future Booking').length;
+  const futureRentals = activeBerths.filter(r => r.occupancyStatus === 'Future Rental').length;
 
   const occupancyPercentage = totalActiveBerths > 0
     ? ((occupied + booked) / totalActiveBerths) * 100
@@ -95,6 +99,8 @@ export function calculateKPIMetrics(data: BerthRecord[]): KPIMetrics {
     occupied,
     booked,
     available,
+    futureBookings,
+    futureRentals,
     occupancyPercentage: Math.round(occupancyPercentage * 10) / 10,
     vesselComplianceRate: Math.round(vesselComplianceRate * 10) / 10,
     averageAge: validAges.length > 0 ? Number(averageAge.toFixed(1)) : 0,

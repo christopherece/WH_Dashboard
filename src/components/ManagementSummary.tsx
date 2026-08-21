@@ -29,7 +29,7 @@ export default function ManagementSummary({ data, metrics }: ManagementSummaryPr
         </span>
       </div>
 
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 xl:grid-cols-6 gap-4">
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Current Occupancy</p>
           <p className="mt-2 text-2xl font-bold text-navy-700">{metrics.occupancyPercentage.toFixed(1)}%</p>
@@ -45,6 +45,14 @@ export default function ManagementSummary({ data, metrics }: ManagementSummaryPr
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Rented</p>
           <p className="mt-2 text-2xl font-bold text-rose-600">{metrics.occupied}</p>
+        </div>
+        <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4 shadow-sm">
+          <p className="text-xs font-medium uppercase tracking-wide text-indigo-700">Future Booking</p>
+          <p className="mt-2 text-2xl font-bold text-indigo-700">{metrics.futureBookings}</p>
+        </div>
+        <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 shadow-sm">
+          <p className="text-xs font-medium uppercase tracking-wide text-sky-700">Future Rental</p>
+          <p className="mt-2 text-2xl font-bold text-sky-700">{metrics.futureRentals}</p>
         </div>
       </div>
 

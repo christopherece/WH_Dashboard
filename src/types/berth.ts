@@ -66,6 +66,8 @@ export interface KPIMetrics {
   occupied: number;
   booked: number;
   available: number;
+  futureBookings: number;
+  futureRentals: number;
   occupancyPercentage: number;
   vesselComplianceRate: number;
   averageAge: number;
