@@ -9,7 +9,6 @@ interface SidebarProps {
 
 const navigation = [
   { name: 'Dashboard', id: 'dashboard' as Page, icon: '📊' },
-  { name: 'Future Availability', id: 'future' as Page, icon: '📅' },
   { name: 'Future Bookings', id: 'future-bookings' as Page, icon: '📌' },
   { name: 'Marina Map', id: 'marina-map' as Page, icon: '🗺️' },
   { name: 'Customer Heat Map', id: 'customer-heatmap' as Page, icon: '🔥' },
