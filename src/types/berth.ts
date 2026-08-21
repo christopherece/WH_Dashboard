@@ -9,6 +9,10 @@ export interface BerthRecord {
   actualLength: number;
   actualWidth: number;
   actualDepth: number;
+  vesselLength?: number | null;
+  vesselWidth?: number | null;
+  berthActualLength?: number | null;
+  berthActualWidth?: number | null;
   marina: string;
   berthStatus: string;
   ownershipTypeId: number;

@@ -51,13 +51,17 @@ export default function VesselComplianceReport({ data, lastUpdated, onRefresh }:
         else overallCompliance = 'Compliant';
 
         // Size compatibility check
-        const vesselLength = record.actualLength || record.nominalLength;
-        const vesselWidth = record.actualWidth || record.nominalWidth;
-        const berthLength = record.nominalLength;
-        const berthWidth = record.nominalWidth;
+        // Compare the vessel dimensions against the berth's actual dimensions, with explicit fallbacks for missing data.
+        const vesselLength = record.vesselLength && record.vesselLength > 0 ? record.vesselLength : (record.actualLength || record.nominalLength);
+        const vesselWidth = record.vesselWidth && record.vesselWidth > 0 ? record.vesselWidth : (record.actualWidth || record.nominalWidth);
+        const berthLength = record.berthActualLength && record.berthActualLength > 0 ? record.berthActualLength : (record.actualLength || record.nominalLength);
+        const berthWidth = record.berthActualWidth && record.berthActualWidth > 0 ? record.berthActualWidth : (record.actualWidth || record.nominalWidth);
+
+        const berthLengthThreshold = berthLength > 0 ? berthLength * 1.02 : berthLength;
+        const berthWidthThreshold = berthWidth > 0 ? berthWidth * 1.02 : berthWidth;
 
         let sizeCompatibility: 'Compatible' | 'Over Size' | 'Under Size';
-        if (vesselLength > berthLength || vesselWidth > berthWidth) {
+        if (vesselLength > berthLengthThreshold || vesselWidth > berthWidthThreshold) {
           sizeCompatibility = 'Over Size';
         } else if (vesselLength < berthLength * 0.7 || vesselWidth < berthWidth * 0.7) {
           sizeCompatibility = 'Under Size';
