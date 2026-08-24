@@ -4,7 +4,7 @@ const fs = require('fs');
 const cors = require('cors');
 
 // Load local configuration when the server is launched directly.
-if (typeof process.loadEnvFile === 'function') {
+if (typeof process.loadEnvFile === 'function' && fs.existsSync('.env')) {
   process.loadEnvFile('.env');
 }
 
@@ -12,7 +12,7 @@ const app = express();
 app.use(cors());
 
 // Configuration
-const DATA_PATH = process.env.DATA_PATH || 'U:\\CCO\\Development Auckland\\700 Marina Ops\\Westhaven\\OccupancyReport';
+const DATA_PATH = process.env.DATA_PATH || '\\\\aklc\\shared\\CCO\\Development Auckland\\700 Marina Ops\\Westhaven\\OccupancyReport';
 const PORT = process.env.SERVER_PORT || 5000;
 
 // Health check

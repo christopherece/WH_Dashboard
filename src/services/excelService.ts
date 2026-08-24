@@ -6,7 +6,9 @@ const EXCEL_FILE_NAMES = [
   'NewDashboardWithCompliance.xlsx',
 ];
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+// Use a relative URL so a browser on another device talks to the laptop hosting
+// the dashboard, rather than its own localhost. Vite proxies this in development.
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 export class ExcelService {
   private cachedData: BerthRecord[] | null = null;
@@ -45,6 +47,11 @@ export class ExcelService {
 
       if (!response || !response.ok) {
         throw new Error(`Failed to load Excel file. Tried API and public folder.`);
+      }
+
+      const contentType = response.headers.get('content-type') || '';
+      if (contentType.includes('text/html')) {
+        throw new Error('The data server returned a web page instead of the Excel workbook. Ensure the dashboard server is running and reachable.');
       }
 
       const arrayBuffer = await response.arrayBuffer();
