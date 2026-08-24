@@ -1,10 +1,12 @@
 import * as XLSX from 'xlsx';
 import { BerthRecord, DataQualityReport } from '../types/berth';
 
-const EXCEL_FILE_PATHS = [
-  '/OccupancyReport.xlsx',
-  '/NewDashboardWithCompliance.xlsx',
+const EXCEL_FILE_NAMES = [
+  'OccupancyReport.xlsx',
+  'NewDashboardWithCompliance.xlsx',
 ];
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 export class ExcelService {
   private cachedData: BerthRecord[] | null = null;
@@ -15,16 +17,34 @@ export class ExcelService {
       let response: Response | null = null;
       let resolvedPath = '';
 
-      for (const filePath of EXCEL_FILE_PATHS) {
-        response = await fetch(filePath);
-        if (response.ok) {
-          resolvedPath = filePath;
-          break;
+      // Try loading from backend API
+      for (const fileName of EXCEL_FILE_NAMES) {
+        try {
+          response = await fetch(`${API_URL}/api/file/${fileName}`);
+          if (response.ok) {
+            resolvedPath = fileName;
+            break;
+          }
+        } catch (error) {
+          console.warn(`Failed to fetch ${fileName} from API:`, error);
+          continue;
+        }
+      }
+
+      // Fallback to public folder if API fails
+      if (!response || !response.ok) {
+        console.info('Falling back to public folder...');
+        for (const fileName of EXCEL_FILE_NAMES) {
+          response = await fetch(`/${fileName}`);
+          if (response.ok) {
+            resolvedPath = `(public) ${fileName}`;
+            break;
+          }
         }
       }
 
       if (!response || !response.ok) {
-        throw new Error(`Failed to load Excel file. Tried: ${EXCEL_FILE_PATHS.join(', ')}`);
+        throw new Error(`Failed to load Excel file. Tried API and public folder.`);
       }
 
       const arrayBuffer = await response.arrayBuffer();
