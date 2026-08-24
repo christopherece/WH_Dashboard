@@ -132,20 +132,47 @@ export default function ManagementSummary({ data, metrics }: ManagementSummaryPr
       </div>
 
       {top3Lengths.length > 1 && (
-        <div className="mt-5 rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-600 mb-3">Top 3 Most Occupied Berth Lengths</p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {top3Lengths.map((item, idx) => (
-              <div key={item.length} className="flex items-center justify-between rounded-lg bg-gradient-to-r from-slate-50 to-slate-100 p-3 border border-slate-200">
-                <div>
-                  <p className="text-sm font-medium text-slate-700">#{idx + 1} - {item.length}m</p>
-                  <p className="text-xs text-slate-500">{item.occupied} / {item.total} berths</p>
+        <div className="mt-5 rounded-xl border border-slate-200 bg-white p-5">
+          <div className="mb-4">
+            <p className="text-sm font-semibold uppercase tracking-wide text-slate-700">Top Occupied Berth Lengths by Percentage</p>
+            <p className="text-xs text-slate-500 mt-1">Ranked by occupancy rate (requires min. 2 berths)</p>
+          </div>
+          <div className="space-y-4">
+            {top3Lengths.filter(item => item.total >= 2).map((item, idx) => {
+              const medalColors = [
+                { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700', bar: 'bg-amber-400', badge: 'bg-amber-100 text-amber-800' },
+                { bg: 'bg-slate-50', border: 'border-slate-300', text: 'text-slate-700', bar: 'bg-slate-400', badge: 'bg-slate-200 text-slate-700' },
+                { bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-700', bar: 'bg-orange-400', badge: 'bg-orange-100 text-orange-800' },
+              ];
+              const colors = medalColors[idx] || medalColors[2];
+              
+              return (
+                <div key={item.length} className={`rounded-lg border ${colors.border} ${colors.bg} p-4`}>
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center gap-3">
+                      <div className={`flex items-center justify-center w-8 h-8 rounded-full font-bold text-white ${idx === 0 ? 'bg-amber-500' : idx === 1 ? 'bg-slate-500' : 'bg-orange-500'}`}>
+                        {idx + 1}
+                      </div>
+                      <div>
+                        <p className={`text-lg font-bold ${colors.text}`}>{item.length}m Berth</p>
+                        <p className={`text-xs ${colors.text} opacity-75`}>{item.occupied} occupied of {item.total} total</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className={`text-2xl font-bold ${colors.text}`}>{item.occupancyPercentage.toFixed(0)}%</p>
+                      <p className="text-xs text-slate-500">occupancy</p>
+                    </div>
+                  </div>
+                  
+                  <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                    <div 
+                      className={`h-full ${colors.bar} transition-all`}
+                      style={{ width: `${item.occupancyPercentage}%` }}
+                    ></div>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-lg font-bold text-teal-600">{item.occupancyPercentage.toFixed(1)}%</p>
-                </div>
-              </div>
-            ))}
+              );
+            }).slice(0, 3)}
           </div>
         </div>
       )}
