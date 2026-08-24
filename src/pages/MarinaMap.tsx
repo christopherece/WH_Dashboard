@@ -19,39 +19,48 @@ function normalizeBerthCode(value: string): string {
   return value.replace(/\s+/g, '').toUpperCase();
 }
 
-const BERTH_ZONE_POSITIONS: Record<string, { x: number; y: number; stepX: number; rowOffset: number }> = {
-  A: { x: 12, y: 18, stepX: 2.2, rowOffset: 0 },
-  AA: { x: 18, y: 24, stepX: 2.2, rowOffset: 0 },
-  AB: { x: 24, y: 24, stepX: 2.2, rowOffset: 0 },
-  B: { x: 32, y: 18, stepX: 2.2, rowOffset: 0 },
-  C: { x: 41, y: 18, stepX: 2.2, rowOffset: 0 },
-  D: { x: 50, y: 18, stepX: 2.2, rowOffset: 0 },
-  E: { x: 59, y: 18, stepX: 2.2, rowOffset: 0 },
-  EB: { x: 67, y: 30, stepX: 2.1, rowOffset: 0 },
-  EBE: { x: 74, y: 39, stepX: 1.9, rowOffset: 0 },
-  ELLIOTT: { x: 81, y: 54, stepX: 1.8, rowOffset: 0 },
-  F: { x: 10, y: 46, stepX: 2.1, rowOffset: 0 },
-  G: { x: 19, y: 46, stepX: 2.1, rowOffset: 0 },
-  H: { x: 29, y: 46, stepX: 2.1, rowOffset: 0 },
-  JS: { x: 39, y: 46, stepX: 2.0, rowOffset: 0 },
-  K: { x: 48, y: 46, stepX: 2.0, rowOffset: 0 },
-  L: { x: 58, y: 46, stepX: 2.0, rowOffset: 0 },
-  M: { x: 15, y: 63, stepX: 2.2, rowOffset: 0 },
-  N: { x: 25, y: 63, stepX: 2.2, rowOffset: 0 },
-  P: { x: 35, y: 63, stepX: 2.2, rowOffset: 0 },
-  Q: { x: 44, y: 63, stepX: 2.2, rowOffset: 0 },
-  R: { x: 53, y: 63, stepX: 2.2, rowOffset: 0 },
-  S: { x: 62, y: 63, stepX: 2.1, rowOffset: 0 },
-  SP: { x: 70, y: 63, stepX: 1.8, rowOffset: 0 },
-  T: { x: 18, y: 77, stepX: 1.9, rowOffset: 0 },
-  U: { x: 27, y: 77, stepX: 1.9, rowOffset: 0 },
-  V: { x: 36, y: 77, stepX: 1.9, rowOffset: 0 },
-  W: { x: 46, y: 77, stepX: 1.9, rowOffset: 0 },
-  X: { x: 56, y: 77, stepX: 1.9, rowOffset: 0 },
-  Y: { x: 18, y: 89, stepX: 1.8, rowOffset: 0 },
-  YC: { x: 28, y: 89, stepX: 1.8, rowOffset: 0 },
-  YEND: { x: 38, y: 89, stepX: 1.8, rowOffset: 0 },
-  Z: { x: 50, y: 89, stepX: 1.8, rowOffset: 0 },
+interface BerthZonePosition {
+  x: number;
+  startY: number;
+  endY: number;
+  firstNumber?: number;
+  lastNumber: number;
+  laneOffset?: number;
+}
+
+// Coordinates are percentages of the original 3110 × 1548 marina plan. Berths
+// run along the piers vertically, not from left to right.
+const BERTH_ZONE_POSITIONS: Record<string, BerthZonePosition> = {
+  A: { x: 48.0, startY: 10.2, endY: 39.4, lastNumber: 55 },
+  AA: { x: 49.3, startY: 10.2, endY: 36.3, lastNumber: 45 },
+  AB: { x: 50.5, startY: 10.2, endY: 37.7, lastNumber: 48 },
+  B: { x: 43.5, startY: 9.0, endY: 35.4, lastNumber: 62 },
+  C: { x: 38.8, startY: 9.0, endY: 34.8, lastNumber: 53 },
+  D: { x: 33.7, startY: 9.2, endY: 33.8, firstNumber: 0, lastNumber: 39 },
+  E: { x: 28.5, startY: 10.3, endY: 37.3, lastNumber: 55 },
+  EB: { x: 30.5, startY: 10.3, endY: 12.0, lastNumber: 1 },
+  EBE: { x: 31.6, startY: 10.3, endY: 13.0, lastNumber: 3 },
+  F: { x: 20.8, startY: 10.4, endY: 40.0, lastNumber: 155, laneOffset: 0.55 },
+  G: { x: 14.7, startY: 10.4, endY: 39.4, firstNumber: 0, lastNumber: 57 },
+  H: { x: 9.9, startY: 10.4, endY: 39.0, lastNumber: 58 },
+  JS: { x: 7.1, startY: 10.8, endY: 24.0, lastNumber: 23 },
+  SP: { x: 6.8, startY: 44.0, endY: 62.0, lastNumber: 15 },
+  K: { x: 8.8, startY: 46.0, endY: 69.0, firstNumber: 2, lastNumber: 56 },
+  L: { x: 12.4, startY: 46.0, endY: 77.0, firstNumber: 2, lastNumber: 64 },
+  M: { x: 16.2, startY: 46.0, endY: 83.5, firstNumber: 2, lastNumber: 72 },
+  N: { x: 19.8, startY: 46.0, endY: 87.0, firstNumber: 2, lastNumber: 74 },
+  P: { x: 25.0, startY: 48.0, endY: 90.5, firstNumber: 2, lastNumber: 78 },
+  Q: { x: 29.2, startY: 48.0, endY: 92.5, firstNumber: 2, lastNumber: 83 },
+  R: { x: 33.0, startY: 48.0, endY: 94.3, lastNumber: 86 },
+  S: { x: 37.8, startY: 48.0, endY: 91.0, lastNumber: 112 },
+  T: { x: 45.5, startY: 50.0, endY: 89.5, lastNumber: 52 },
+  U: { x: 51.3, startY: 50.0, endY: 88.5, lastNumber: 60 },
+  V: { x: 57.7, startY: 50.0, endY: 89.0, firstNumber: 0, lastNumber: 68 },
+  W: { x: 61.5, startY: 50.0, endY: 89.0, lastNumber: 74 },
+  X: { x: 65.3, startY: 50.0, endY: 89.0, lastNumber: 77 },
+  Y: { x: 69.5, startY: 49.5, endY: 79.0, lastNumber: 57 },
+  YC: { x: 52.5, startY: 85.0, endY: 91.7, lastNumber: 36 },
+  Z: { x: 84.5, startY: 76.0, endY: 97.0, firstNumber: 0, lastNumber: 51 },
 };
 
 function getMarkerPosition(code: string) {
@@ -66,9 +75,14 @@ function getMarkerPosition(code: string) {
     .find(zone => prefix === zone || prefix.startsWith(zone)) || 'A';
 
   const zone = BERTH_ZONE_POSITIONS[zoneKey] || BERTH_ZONE_POSITIONS.A;
-  const index = Math.max(0, numericPart - 1);
-  const x = zone.x + index * zone.stepX;
-  const y = zone.y + (index > 12 ? 0.6 : 0) + zone.rowOffset;
+  const firstNumber = zone.firstNumber ?? 1;
+  const index = Math.max(0, numericPart - firstNumber);
+  const berthCount = Math.max(1, zone.lastNumber - firstNumber + 1);
+  const rowCount = Math.ceil(berthCount / 2);
+  const rowIndex = Math.floor(index / 2);
+  const progress = Math.min(rowIndex / Math.max(rowCount - 1, 1), 1);
+  const x = zone.x + (index % 2 === 0 ? -(zone.laneOffset ?? 0.8) : (zone.laneOffset ?? 0.8));
+  const y = zone.startY + progress * (zone.endY - zone.startY);
 
   return {
     left: `${Math.min(Math.max(x, 4), 96)}%`,
@@ -147,11 +161,11 @@ export default function MarinaMap({ data, lastUpdated, onRefresh }: MarinaMapPro
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
+        <div className="relative aspect-[3110/1548] overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
           <img
             src="/Westhaven Marina Main.png"
             alt="Westhaven marina map"
-            className="h-[760px] w-full object-contain object-center"
+            className="h-full w-full object-cover"
           />
 
           <div className="absolute inset-0">
@@ -159,11 +173,9 @@ export default function MarinaMap({ data, lastUpdated, onRefresh }: MarinaMapPro
               <div
                 key={`${marker.code}-${marker.status}`}
                 title={`${marker.code}: ${marker.status}`}
-                className={`absolute -translate-x-1/2 -translate-y-1/2 flex h-3.5 w-3.5 items-center justify-center rounded-full border text-[5px] font-bold shadow-sm ${STATUS_COLORS[marker.status] || 'bg-slate-400 border-slate-500 text-white'}`}
+                className={`absolute -translate-x-1/2 -translate-y-1/2 h-3.5 w-3.5 rounded-full border shadow-sm ring-1 ring-white/70 ${STATUS_COLORS[marker.status] || 'bg-slate-400 border-slate-500 text-white'}`}
                 style={{ left: marker.position.left, top: marker.position.top, transform: 'translate(-50%, -50%)' }}
-              >
-                {marker.code.replace(/\D+/, '')}
-              </div>
+              />
             ))}
           </div>
         </div>
