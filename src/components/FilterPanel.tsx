@@ -17,7 +17,7 @@ interface FilterPanelProps {
 const OCCUPANCY_STATUSES = ['Available', 'Rented', 'Booked', 'Future Booking', 'Future Rental'];
 
 export default function FilterPanel({ filters, onFilterChange, onClearFilters, uniqueValues }: FilterPanelProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true);
 
   const handleFilterChange = (key: keyof FilterState, value: any) => {
     onFilterChange({

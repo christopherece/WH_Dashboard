@@ -106,7 +106,7 @@ export class ExcelService {
           actualWidth: this.parseNumber(this.getFirstValue(normalizedRow, ['ActualWidth', 'BerthActualWidth'])),
           actualDepth: this.parseNumber(this.getFirstValue(normalizedRow, ['ActualDepth', 'BerthActualDepth'])),
           vesselLength: this.parseNumber(this.getFirstValue(normalizedRow, ['VesselLength', 'VesselLengthM', 'BoatLength', 'BoatLengthM'])),
-          vesselWidth: this.parseNumber(this.getFirstValue(normalizedRow, ['VesselWidth', 'VesselWidthM', 'BoatWidth', 'BoatWidthM'])),
+          vesselWidth: this.parseNumber(this.getFirstValue(normalizedRow, ['VesselWidth', 'VesselWidthM', 'VesselBeam', 'Beam', 'BoatWidth', 'BoatWidthM'])),
           berthActualLength: this.parseNumber(this.getFirstValue(normalizedRow, ['BerthActualLength', 'ActualLength'])),
           berthActualWidth: this.parseNumber(this.getFirstValue(normalizedRow, ['BerthActualWidth', 'ActualWidth'])),
           marina: this.parseString(this.getFirstValue(normalizedRow, ['Marina', 'MARINA'])),

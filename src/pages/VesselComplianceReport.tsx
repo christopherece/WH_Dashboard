@@ -8,7 +8,7 @@ interface VesselComplianceReportProps {
 }
 
 export default function VesselComplianceReport({ data, lastUpdated, onRefresh }: VesselComplianceReportProps) {
-  const [showAll, setShowAll] = useState(false);
+  const [showAll, setShowAll] = useState(true);
   const [warningDays, setWarningDays] = useState(30); // Days before expiry to show as warning
   const [complianceFilter, setComplianceFilter] = useState<'all' | 'compliant' | 'warning' | 'non-compliant'>('all');
   const [sizeFilter, setSizeFilter] = useState<'all' | 'compatible' | 'over-size' | 'under-size'>('all');
