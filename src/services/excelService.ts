@@ -8,7 +8,13 @@ const EXCEL_FILE_NAMES = [
 
 // Use a relative URL so a browser on another device talks to the laptop hosting
 // the dashboard, rather than its own localhost. Vite proxies this in development.
-const API_URL = import.meta.env.VITE_API_URL || '';
+// A localhost value is only valid for the hosting laptop, so never send it to
+// browsers opened from another device.
+const configuredApiUrl = import.meta.env.VITE_API_URL?.trim();
+const isLocalOnlyUrl = configuredApiUrl
+  ? /^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?\/?$/i.test(configuredApiUrl)
+  : false;
+const API_URL = configuredApiUrl && !isLocalOnlyUrl ? configuredApiUrl.replace(/\/$/, '') : '';
 
 export class ExcelService {
   private cachedData: BerthRecord[] | null = null;
