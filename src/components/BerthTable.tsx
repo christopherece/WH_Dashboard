@@ -17,8 +17,10 @@ export default function BerthTable({ data, onBerthClick, showTechnicalDetails }:
 
   const filteredData = data.filter(record => {
     const searchLower = searchTerm.toLowerCase();
+    const berthSearch = searchTerm.replace(/[\s-]+/g, '').toUpperCase();
+    const berthCode = record.berth.replace(/[\s-]+/g, '').toUpperCase();
     return (
-      record.berth.toLowerCase().includes(searchLower) ||
+      berthCode.includes(berthSearch) ||
       record.pier.toString().toLowerCase().includes(searchLower) ||
       record.berthType.toLowerCase().includes(searchLower) ||
       (record.customerName && record.customerName.toLowerCase().includes(searchLower)) ||
@@ -77,13 +79,23 @@ export default function BerthTable({ data, onBerthClick, showTechnicalDetails }:
     <div>
       {/* Search */}
       <div className="mb-4">
+        <label htmlFor="berth-search" className="mb-1 block text-sm font-medium text-slate-700">
+          Search berths
+        </label>
         <input
+          id="berth-search"
           type="text"
-          placeholder="Search by berth, pier, type, customer, vessel, or status..."
+          placeholder="Enter a berth code, e.g. A01 or F-102"
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          onChange={(e) => {
+            setSearchTerm(e.target.value);
+            setCurrentPage(1);
+          }}
           className="input"
         />
+        <p className="mt-1 text-xs text-slate-500">
+          Berth codes ignore spaces and dashes. You can also search by pier, customer, vessel or status.
+        </p>
       </div>
 
       {/* Table */}

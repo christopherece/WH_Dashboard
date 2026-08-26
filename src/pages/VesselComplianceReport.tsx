@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
-import { BerthRecord, VesselCompliance } from '../types/berth';
+import { BerthRecord } from '../types/berth';
+import { exportToCSV } from '../utils/dataUtils';
 
 interface VesselComplianceReportProps {
   data: BerthRecord[];
@@ -57,11 +58,13 @@ export default function VesselComplianceReport({ data, lastUpdated, onRefresh }:
         const berthLength = record.berthActualLength && record.berthActualLength > 0 ? record.berthActualLength : (record.actualLength || record.nominalLength);
         const berthWidth = record.berthActualWidth && record.berthActualWidth > 0 ? record.berthActualWidth : (record.actualWidth || record.nominalWidth);
 
-        const berthLengthThreshold = berthLength > 0 ? berthLength * 1.02 : berthLength;
-        const berthWidthThreshold = berthWidth > 0 ? berthWidth * 1.02 : berthWidth;
+        // Allow a 2% overage only against the berth's Actual Length. Width has no tolerance.
+        const berthLengthThreshold = record.berthActualLength && record.berthActualLength > 0
+          ? record.berthActualLength * 1.02
+          : berthLength;
 
         let sizeCompatibility: 'Compatible' | 'Over Size' | 'Under Size';
-        if (vesselLength > berthLengthThreshold || vesselWidth > berthWidthThreshold) {
+        if (vesselLength > berthLengthThreshold || vesselWidth > berthWidth) {
           sizeCompatibility = 'Over Size';
         } else if (vesselLength < berthLength * 0.7 || vesselWidth < berthWidth * 0.7) {
           sizeCompatibility = 'Under Size';
@@ -229,6 +232,33 @@ export default function VesselComplianceReport({ data, lastUpdated, onRefresh }:
     });
   };
 
+  const handleExport = () => {
+    const exportRows = displayData.map((item) => ({
+      'Vessel ID': item.vesselId || '',
+      Vessel: item.vesselName,
+      Berth: item.berth,
+      Pier: item.pier,
+      Customer: item.customerName || '',
+      'Power Connection': item.powerConnectionType || '',
+      'Insurance Expiry': formatDate(item.insuranceExpiry),
+      'Insurance Status': item.insuranceStatus,
+      'EWOF Required': item.ewofRequired ? 'Yes' : 'No',
+      'EWOF Expiry': formatDate(item.ewofExpiry),
+      'EWOF Status': item.ewofRequired ? item.ewofStatus : 'Not Required',
+      'TNT Required': item.tntRequired ? 'Yes' : 'No',
+      'TNT Expiry': formatDate(item.tntExpiry),
+      'TNT Status': item.tntRequired ? item.tntStatus : 'Not Required',
+      'Overall Compliance': item.overallCompliance,
+      'Size Compatibility': item.sizeCompatibility,
+      'Vessel Length (m)': item.vesselLength,
+      'Vessel Width (m)': item.vesselWidth,
+      'Berth Length (m)': item.berthLength,
+      'Berth Width (m)': item.berthWidth,
+    }));
+
+    exportToCSV(exportRows, 'vessel-compliance-report.csv');
+  };
+
   return (
     <div className="w-full p-4 sm:p-6 space-y-6">
       {/* Header */}
@@ -239,12 +269,21 @@ export default function VesselComplianceReport({ data, lastUpdated, onRefresh }:
             Data Last Updated: {formatLastUpdated()}
           </p>
         </div>
-        <button
-          onClick={onRefresh}
-          className="btn btn-secondary w-full sm:w-auto"
-        >
-          Refresh Data
-        </button>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          <button
+            onClick={handleExport}
+            className="btn btn-primary w-full sm:w-auto"
+            disabled={!displayData.length}
+          >
+            Export Report
+          </button>
+          <button
+            onClick={onRefresh}
+            className="btn btn-secondary w-full sm:w-auto"
+          >
+            Refresh Data
+          </button>
+        </div>
       </div>
 
       {/* Summary Statistics */}
