@@ -17,10 +17,13 @@ const navigation = [
   { name: 'Berths', id: 'berths' as Page, icon: '⚓' },
   { name: 'Ownership', id: 'ownership' as Page, icon: '🏢' },
   { name: 'Vessel Compliance', id: 'compliance' as Page, icon: '🛡️' },
-  { name: 'Reversion Report', id: 'reversion' as Page, icon: 'R' },
   { name: 'Reports', id: 'reports' as Page, icon: '📋' },
   { name: 'Data Quality', id: 'quality' as Page, icon: '✅' },
-];
+  { name: 'Reversion Report', id: 'reversion' as Page, icon: 'R' },
+].sort((a, b) => {
+  const order = (page: Page) => page === 'dashboard' ? 0 : page === 'reversion' ? 1 : 2;
+  return order(a.id) - order(b.id);
+});
 
 export default function Sidebar({ currentPage, onPageChange }: SidebarProps) {
   return (
