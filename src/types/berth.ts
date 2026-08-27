@@ -50,6 +50,23 @@ export interface BerthRecord {
   tntExpiry: Date | null;
 }
 
+export interface ReversionRecord {
+  trustGroup: string;
+  ownershipType: string;
+  customerId: string | null;
+  owner: string | null;
+  pier: string | number;
+  berth: string;
+  berthType: string;
+  berthLength: number;
+  occupancyStatus: string;
+  occupier: string | null;
+  occupierType: string | null;
+  rentalStartDate: Date | null;
+  rentalEndDate: Date | null;
+  rentalAgreementId: string | null;
+}
+
 export type OccupancyStatus = 'Available' | 'Rented' | 'Booked' | 'Future Booking' | 'Future Rental';
 
 export interface FilterState {

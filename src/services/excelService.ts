@@ -1,10 +1,11 @@
 import * as XLSX from 'xlsx';
-import { BerthRecord, DataQualityReport } from '../types/berth';
+import { BerthRecord, DataQualityReport, ReversionRecord } from '../types/berth';
 
 const EXCEL_FILE_NAMES = [
   'OccupancyReport.xlsx',
   'NewDashboardWithCompliance.xlsx',
 ];
+const REVERSION_FILE_NAME = 'ReversionMasterQuery.xlsx';
 
 // Use a relative URL so a browser on another device talks to the laptop hosting
 // the dashboard, rather than its own localhost. Vite proxies this in development.
@@ -98,6 +99,35 @@ export class ExcelService {
     }
   }
 
+  async loadReversionData(): Promise<ReversionRecord[]> {
+    let response: Response | null = null;
+
+    try {
+      response = await fetch(`${API_URL}/api/file/${REVERSION_FILE_NAME}`);
+    } catch (error) {
+      console.warn('Failed to fetch Reversion Master Query from API:', error);
+    }
+
+    if (!response?.ok) {
+      response = await fetch(`/${REVERSION_FILE_NAME}`);
+    }
+
+    if (!response.ok) {
+      throw new Error('Reversion Master Query data is currently unavailable. Ensure ReversionMasterQuery.xlsx is present in the configured data folder.');
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rawData = XLSX.utils.sheet_to_json(worksheet);
+
+    if (!rawData.length) {
+      throw new Error('Reversion Master Query contains no data.');
+    }
+
+    return this.parseReversionData(rawData);
+  }
+
   private parseData(rawData: any[]): BerthRecord[] {
     return rawData.map((row: any, index: number) => {
       try {
@@ -173,6 +203,28 @@ export class ExcelService {
         return this.getDefaultRecord();
       }
     }).filter(record => record.berthId > 0); // Filter out completely invalid records
+  }
+
+  private parseReversionData(rawData: any[]): ReversionRecord[] {
+    return rawData.map((row) => {
+      const normalizedRow = this.normalizeRowKeys(row);
+      return {
+        trustGroup: this.parseString(this.getFirstValue(normalizedRow, ['TrustGroup'])),
+        ownershipType: this.parseString(this.getFirstValue(normalizedRow, ['OwnershipType'])),
+        customerId: this.parseNullableString(this.getFirstValue(normalizedRow, ['CustomerID'])),
+        owner: this.parseNullableString(this.getFirstValue(normalizedRow, ['Owner'])),
+        pier: this.parseStringOrNumber(this.getFirstValue(normalizedRow, ['Pier'])),
+        berth: this.parseString(this.getFirstValue(normalizedRow, ['Berth'])),
+        berthType: this.parseString(this.getFirstValue(normalizedRow, ['BerthType'])),
+        berthLength: this.parseNumber(this.getFirstValue(normalizedRow, ['BerthLength'])),
+        occupancyStatus: this.parseString(this.getFirstValue(normalizedRow, ['OccupancyStatus'])),
+        occupier: this.parseNullableString(this.getFirstValue(normalizedRow, ['Occupier'])),
+        occupierType: this.parseNullableString(this.getFirstValue(normalizedRow, ['OccupierType'])),
+        rentalStartDate: this.parseDate(this.getFirstValue(normalizedRow, ['RentalStartDate'])),
+        rentalEndDate: this.parseDate(this.getFirstValue(normalizedRow, ['RentalEndDate'])),
+        rentalAgreementId: this.parseNullableString(this.getFirstValue(normalizedRow, ['RentalAgreementID'])),
+      };
+    }).filter((record) => record.berth);
   }
 
   private getDefaultRecord(): BerthRecord {
@@ -313,9 +365,10 @@ export class ExcelService {
 
     if (typeof value === 'number') {
       if (!Number.isFinite(value) || value === 0) return null;
-      const excelEpoch = new Date(1899, 11, 30);
-      const date = new Date(excelEpoch.getTime() + value * 86400000);
-      return date;
+      // Excel stores dates as day serials. Parse their calendar components directly
+      // to avoid daylight-saving offsets changing the displayed date.
+      const excelDate = XLSX.SSF.parse_date_code(value);
+      return excelDate ? new Date(excelDate.y, excelDate.m - 1, excelDate.d) : null;
     }
 
     return null;
