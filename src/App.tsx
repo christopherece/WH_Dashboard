@@ -89,7 +89,7 @@ function App() {
       case 'future':
         return <FutureAvailability allData={data} filters={filters} lastUpdated={lastUpdated} onRefresh={handleRefresh} />;
       case 'future-bookings':
-        return <FutureBookings data={filteredData} lastUpdated={lastUpdated} onRefresh={handleRefresh} />;
+        return <FutureBookings data={data} lastUpdated={lastUpdated} onRefresh={handleRefresh} />;
       case 'marina-map':
         return <MarinaMap data={filteredData} lastUpdated={lastUpdated} onRefresh={handleRefresh} />;
       case 'customer-heatmap':

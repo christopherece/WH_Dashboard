@@ -11,7 +11,11 @@ export default function FutureBookings({ data, lastUpdated, onRefresh }: FutureB
   const futureRecords = useMemo(() => {
     return data.filter(record =>
       record.occupancyStatus === 'Future Booking' || record.occupancyStatus === 'Future Rental'
-    );
+    ).sort((a, b) => {
+      const aDate = a.bookingEnteredDate?.getTime() ?? a.dateIn?.getTime() ?? 0;
+      const bDate = b.bookingEnteredDate?.getTime() ?? b.dateIn?.getTime() ?? 0;
+      return bDate - aDate;
+    });
   }, [data]);
 
   const bookingCount = futureRecords.filter(r => r.occupancyStatus === 'Future Booking').length;
@@ -81,18 +85,19 @@ export default function FutureBookings({ data, lastUpdated, onRefresh }: FutureB
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Vessel</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Date In</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Date Out</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Booking Entered</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 bg-white">
               {futureRecords.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-sm text-slate-500">
+                  <td colSpan={10} className="px-4 py-8 text-center text-sm text-slate-500">
                     No future booking or rental records found for the current filtered data.
                   </td>
                 </tr>
               ) : (
                 futureRecords.map((record) => (
-                  <tr key={`${record.berthId}-${record.occupancyStatus}-${record.customerName || 'unknown'}`} className="hover:bg-slate-50">
+                  <tr key={`${record.berthId}-${record.bookingId || record.rentalAgreementId || record.occupancyStatus}-${record.customerName || 'unknown'}`} className="hover:bg-slate-50">
                     <td className="px-4 py-3 text-sm font-medium text-slate-900">{record.berth || '—'}</td>
                     <td className="px-4 py-3 text-sm text-slate-600">{record.marina || '—'}</td>
                     <td className="px-4 py-3 text-sm text-slate-600">{record.pier || '—'}</td>
@@ -106,6 +111,7 @@ export default function FutureBookings({ data, lastUpdated, onRefresh }: FutureB
                     <td className="px-4 py-3 text-sm text-slate-600">{record.vesselName || '—'}</td>
                     <td className="px-4 py-3 text-sm text-slate-600">{formatDate(record.dateIn)}</td>
                     <td className="px-4 py-3 text-sm text-slate-600">{formatDate(record.dateOut)}</td>
+                    <td className="px-4 py-3 text-sm text-slate-600">{formatDate(record.bookingEnteredDate)}</td>
                   </tr>
                 ))
               )}
