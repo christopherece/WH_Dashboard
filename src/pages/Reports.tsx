@@ -8,7 +8,7 @@ interface ReportsProps {
   onRefresh: () => void;
 }
 
-type ReportType = 'occupancy' | 'availability' | 'pier' | 'ownership' | 'berthType' | 'futureStatus' | 'customerAge' | 'recommendations';
+type ReportType = 'occupancy' | 'availability' | 'pier' | 'ownership' | 'berthType' | 'futureStatus' | 'customerAge';
 
 const calculateCustomerAge = (dateOfBirth: Date | null): number | null => {
   if (!dateOfBirth || Number.isNaN(dateOfBirth.getTime())) return null;
@@ -25,59 +25,7 @@ const calculateCustomerAge = (dateOfBirth: Date | null): number | null => {
 };
 
 export default function Reports({ data, lastUpdated, onRefresh }: ReportsProps) {
-  const [selectedReport, setSelectedReport] = useState<ReportType>('recommendations');
-
-  const generateRecommendationsReport = () => {
-    const metrics = calculateKPIMetrics(data);
-    const pierData = calculatePierOccupancy(data);
-    const futureCommitments = metrics.futureBookings + metrics.futureRentals;
-    const highAvailabilityPier = pierData
-      .filter(pier => pier.totalBerths >= 10 && pier.available > 0)
-      .sort((a, b) => b.available - a.available)[0];
-    const highDemandPiers = pierData
-      .filter(pier => pier.totalBerths >= 10 && pier.occupancyPercentage >= 95)
-      .sort((a, b) => b.occupancyPercentage - a.occupancyPercentage)
-      .slice(0, 3);
-    const availablePercentage = metrics.totalActiveBerths > 0
-      ? ((metrics.available / metrics.totalActiveBerths) * 100).toFixed(1)
-      : '0';
-    const highDemandEvidence = highDemandPiers
-      .map(pier => 'Pier ' + pier.pier + ' (' + pier.occupancyPercentage.toFixed(1) + '%)')
-      .join(', ');
-
-    return [
-      {
-        priority: 'Capacity',
-        evidence: metrics.available + ' active berths are currently available (' + availablePercentage + '% of active inventory).',
-        recommendation: highAvailabilityPier
-          ? 'Prioritise sales and marketing activity for Pier ' + highAvailabilityPier.pier + ', which has ' + highAvailabilityPier.available + ' available berths.'
-          : 'Prioritise sales activity for currently available berths.',
-      },
-      {
-        priority: 'Demand management',
-        evidence: highDemandPiers.length > 0
-          ? highDemandEvidence + (highDemandPiers.length === 1 ? ' is' : ' are') + ' at or above 95% occupancy.'
-          : 'No major pier is currently above the 95% occupancy threshold.',
-        recommendation: highDemandPiers.length > 0
-          ? 'Maintain a waitlist and monitor upcoming end dates to match demand with new availability quickly.'
-          : 'Continue monitoring occupancy by pier to identify emerging capacity constraints.',
-      },
-      {
-        priority: 'Future pipeline',
-        evidence: futureCommitments + ' future commitments are recorded (' + metrics.futureBookings + ' bookings and ' + metrics.futureRentals + ' rentals).',
-        recommendation: futureCommitments > 0
-          ? 'Confirm documentation and berth readiness for upcoming commitments, then backfill any resulting vacancies.'
-          : 'Review upcoming enquiries and expiring agreements to maintain the occupancy pipeline.',
-      },
-      {
-        priority: 'Vessel compliance',
-        evidence: metrics.vesselComplianceRate.toFixed(1) + '% of rented vessels are currently clear of expired or near-expiry compliance items.',
-        recommendation: metrics.vesselComplianceRate < 90
-          ? 'Prioritise follow-up on expired and near-expiry insurance, EWOF and TNT records before their next review date.'
-          : 'Continue the current compliance review cadence and monitor upcoming expiries.',
-      },
-    ];
-  };
+  const [selectedReport, setSelectedReport] = useState<ReportType>('occupancy');
 
   const generateReport = () => {
     switch (selectedReport) {
@@ -95,8 +43,6 @@ export default function Reports({ data, lastUpdated, onRefresh }: ReportsProps) 
         return generateFutureStatusReport();
       case 'customerAge':
         return generateCustomerAgeReport();
-      case 'recommendations':
-        return generateRecommendationsReport();
       default:
         return [];
     }
@@ -213,7 +159,6 @@ export default function Reports({ data, lastUpdated, onRefresh }: ReportsProps) 
     { id: 'berthType' as ReportType, name: 'Berth Type Analysis' },
     { id: 'futureStatus' as ReportType, name: 'Future Booking & Rental' },
     { id: 'customerAge' as ReportType, name: 'Customer Age Statistics' },
-    { id: 'recommendations' as ReportType, name: 'Operational Recommendations' },
   ];
 
   const reportData = generateReport();
@@ -282,9 +227,15 @@ export default function Reports({ data, lastUpdated, onRefresh }: ReportsProps) 
             <tbody className="bg-white divide-y divide-gray-200">
               {reportData.map((row, index) => (
                 <tr key={index}>
-                  {Object.values(row).map((value: any, cellIndex) => (
+                  {Object.entries(row).map(([key, value]: [string, any], cellIndex) => (
                     <td key={cellIndex} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {typeof value === 'number' && value % 1 !== 0 ? value.toFixed(1) : value}
+                      {typeof value === 'number'
+                        ? /percentage/i.test(key)
+                          ? `${value.toFixed(1)}%`
+                          : value % 1 !== 0
+                            ? value.toFixed(1)
+                            : value
+                        : value}
                     </td>
                   ))}
                 </tr>
