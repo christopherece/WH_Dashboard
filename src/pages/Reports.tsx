@@ -1,6 +1,4 @@
 import { useState } from 'react';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { BerthRecord } from '../types/berth';
 import { calculateKPIMetrics, calculatePierOccupancy, calculateBerthTypeOccupancy, calculateOwnershipOccupancy, exportToCSV } from '../utils/dataUtils';
 
@@ -245,151 +243,208 @@ export default function Reports({ data, lastUpdated, onRefresh }: ReportsProps) 
       });
     const customerAgeData = generateCustomerAgeReport();
 
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    const pageWidth = doc.internal.pageSize.getWidth();
     const reportDate = new Date();
     const generatedLabel = reportDate.toLocaleString('en-NZ');
     const updatedLabel = lastUpdated ? lastUpdated.toLocaleString('en-NZ') : 'Unknown';
 
-    doc.setFillColor(15, 23, 42);
-    doc.rect(0, 0, pageWidth, 34, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(16);
-    doc.text('Westhaven Dashboard', 14, 12);
-    doc.setFontSize(13);
-    doc.text('Master Summary Report', 14, 20);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    doc.text(`Generated: ${generatedLabel}`, 14, 27);
-    doc.text(`Data Last Updated: ${updatedLabel}`, 14, 32);
+    const escapeHtml = (value: string | number): string => String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
 
-    const kpiCards = [
-      { label: 'Active Berths', value: String(metrics.totalActiveBerths) },
-      { label: 'Occupancy', value: `${metrics.occupancyPercentage.toFixed(1)}%` },
-      { label: 'Available', value: String(metrics.available) },
-      { label: 'Compliance', value: `${metrics.vesselComplianceRate.toFixed(1)}%` },
-    ];
+    const renderRows = (rows: Array<Array<string | number>>) => rows
+      .map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`)
+      .join('');
 
-    const cardWidth = (pageWidth - 34) / 4;
-    const cardY = 41;
-    kpiCards.forEach((card, index) => {
-      const x = 14 + (index * (cardWidth + 2));
-      doc.setFillColor(241, 245, 249);
-      doc.roundedRect(x, cardY, cardWidth, 20, 2, 2, 'F');
-      doc.setTextColor(71, 85, 105);
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9);
-      doc.text(card.label, x + 3, cardY + 7);
-      doc.setTextColor(15, 23, 42);
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(13);
-      doc.text(card.value, x + 3, cardY + 15);
-    });
+    const renderSection = (title: string, headers: string[], rows: Array<Array<string | number>>) => {
+      const bodyRows = rows.length > 0
+        ? renderRows(rows)
+        : '<tr><td colspan="99" class="empty">No records available.</td></tr>';
 
-    let cursorY = 68;
-
-    const ensureSpace = (requiredHeight: number) => {
-      const pageHeight = doc.internal.pageSize.getHeight();
-      if (cursorY + requiredHeight > pageHeight - 12) {
-        doc.addPage();
-        cursorY = 16;
-      }
+      return `
+        <section class="section">
+          <h2>${escapeHtml(title)}</h2>
+          <table>
+            <thead>
+              <tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join('')}</tr>
+            </thead>
+            <tbody>
+              ${bodyRows}
+            </tbody>
+          </table>
+        </section>
+      `;
     };
 
-    const addSectionTitle = (title: string) => {
-      ensureSpace(12);
-      doc.setTextColor(15, 23, 42);
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(12);
-      doc.text(title, 14, cursorY);
-      cursorY += 3;
-      doc.setDrawColor(203, 213, 225);
-      doc.line(14, cursorY, pageWidth - 14, cursorY);
-      cursorY += 4;
-    };
+    const html = `
+      <!doctype html>
+      <html lang="en">
+      <head>
+        <meta charset="utf-8" />
+        <title>Westhaven Master Summary</title>
+        <style>
+          @page { size: A4 portrait; margin: 12mm; }
+          * { box-sizing: border-box; }
+          body {
+            margin: 0;
+            font-family: Segoe UI, Arial, sans-serif;
+            color: #1f2937;
+            background: #f8fafc;
+          }
+          .header {
+            background: #0f172a;
+            color: #ffffff;
+            border-radius: 10px;
+            padding: 16px 18px;
+            margin-bottom: 14px;
+          }
+          .header h1 { margin: 0; font-size: 20px; }
+          .header p { margin: 6px 0 0; font-size: 12px; opacity: 0.92; }
+          .kpis {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+            margin-bottom: 14px;
+          }
+          .kpi {
+            background: #ffffff;
+            border: 1px solid #dbeafe;
+            border-radius: 10px;
+            padding: 10px;
+          }
+          .kpi .label { font-size: 11px; color: #475569; margin-bottom: 6px; }
+          .kpi .value { font-size: 20px; font-weight: 700; color: #0f172a; }
+          .section {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 10px;
+            margin-bottom: 12px;
+            break-inside: avoid;
+          }
+          .section h2 {
+            margin: 0 0 8px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid #cbd5e1;
+            font-size: 14px;
+            color: #0f172a;
+          }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+          }
+          th {
+            text-align: left;
+            background: #1d4ed8;
+            color: #ffffff;
+            padding: 6px;
+          }
+          td {
+            padding: 6px;
+            border-bottom: 1px solid #e2e8f0;
+            vertical-align: top;
+          }
+          tbody tr:nth-child(even) td { background: #f8fafc; }
+          .empty { text-align: center; color: #64748b; padding: 10px; }
+          @media print {
+            body { background: #ffffff; }
+            .section { break-inside: avoid-page; }
+          }
+        </style>
+      </head>
+      <body>
+        <header class="header">
+          <h1>Westhaven Dashboard - Master Summary Report</h1>
+          <p>Generated: ${escapeHtml(generatedLabel)}</p>
+          <p>Data Last Updated: ${escapeHtml(updatedLabel)}</p>
+        </header>
 
-    const addTable = (head: string[], body: (string | number)[][]) => {
-      autoTable(doc, {
-        startY: cursorY,
-        head: [head],
-        body,
-        margin: { left: 14, right: 14 },
-        styles: { fontSize: 8.5, cellPadding: 2, textColor: [51, 65, 85] },
-        headStyles: { fillColor: [30, 64, 175], textColor: [255, 255, 255], fontStyle: 'bold' },
-        alternateRowStyles: { fillColor: [248, 250, 252] },
-      });
-      cursorY = (doc as any).lastAutoTable.finalY + 6;
-    };
+        <section class="kpis">
+          <article class="kpi"><div class="label">Active Berths</div><div class="value">${metrics.totalActiveBerths}</div></article>
+          <article class="kpi"><div class="label">Occupancy</div><div class="value">${metrics.occupancyPercentage.toFixed(1)}%</div></article>
+          <article class="kpi"><div class="label">Available</div><div class="value">${metrics.available}</div></article>
+          <article class="kpi"><div class="label">Compliance</div><div class="value">${metrics.vesselComplianceRate.toFixed(1)}%</div></article>
+        </section>
 
-    addSectionTitle('Executive Summary');
-    addTable(
-      ['Metric', 'Value', 'Notes'],
-      [
-        ['Total Active Berths', metrics.totalActiveBerths, 'Current active berth inventory'],
-        ['Occupied Berths', metrics.occupied, 'Current rented berths'],
-        ['Booked Berths', metrics.booked, 'Current booked berths'],
-        ['Available Berths', metrics.available, 'Current available berths'],
-        ['Overall Occupancy', `${metrics.occupancyPercentage.toFixed(1)}%`, 'Occupied + booked share'],
-        ['Vessel Compliance', `${metrics.vesselComplianceRate.toFixed(1)}%`, 'No expired or near-expiry items'],
-        ['Future Commitments', metrics.futureBookings + metrics.futureRentals, 'Future booking + rental records'],
-      ]
-    );
+        ${renderSection('Executive Summary', ['Metric', 'Value', 'Notes'], [
+          ['Total Active Berths', metrics.totalActiveBerths, 'Current active berth inventory'],
+          ['Occupied Berths', metrics.occupied, 'Current rented berths'],
+          ['Booked Berths', metrics.booked, 'Current booked berths'],
+          ['Available Berths', metrics.available, 'Current available berths'],
+          ['Overall Occupancy', `${metrics.occupancyPercentage.toFixed(1)}%`, 'Occupied + booked share'],
+          ['Vessel Compliance', `${metrics.vesselComplianceRate.toFixed(1)}%`, 'No expired or near-expiry items'],
+          ['Future Commitments', metrics.futureBookings + metrics.futureRentals, 'Future booking + rental records'],
+        ])}
 
-    addSectionTitle('Pier Occupancy');
-    addTable(
-      ['Pier', 'Total', 'Occupied', 'Booked', 'Available', 'Occupancy %'],
-      pierData.map(pier => [pier.pier, pier.totalBerths, pier.occupied, pier.booked, pier.available, `${pier.occupancyPercentage.toFixed(1)}%`])
-    );
+        ${renderSection('Pier Occupancy', ['Pier', 'Total', 'Occupied', 'Booked', 'Available', 'Occupancy %'],
+          pierData.map((pier) => [
+            String(pier.pier),
+            pier.totalBerths,
+            pier.occupied,
+            pier.booked,
+            pier.available,
+            `${pier.occupancyPercentage.toFixed(1)}%`,
+          ])
+        )}
 
-    addSectionTitle('Ownership Summary');
-    addTable(
-      ['Ownership Type', 'Total', 'Occupied', 'Booked', 'Available', 'Occupancy %'],
-      ownershipData.map(item => [item.ownershipType, item.totalBerths, item.occupied, item.booked, item.available, `${item.occupancyPercentage.toFixed(1)}%`])
-    );
+        ${renderSection('Ownership Summary', ['Ownership Type', 'Total', 'Occupied', 'Booked', 'Available', 'Occupancy %'],
+          ownershipData.map((item) => [
+            item.ownershipType,
+            item.totalBerths,
+            item.occupied,
+            item.booked,
+            item.available,
+            `${item.occupancyPercentage.toFixed(1)}%`,
+          ])
+        )}
 
-    addSectionTitle('Berth Type Analysis');
-    addTable(
-      ['Berth Type', 'Total', 'Occupied', 'Booked', 'Available', 'Occupancy %'],
-      berthTypeData.map(item => [item.berthType, item.totalBerths, item.occupied, item.booked, item.available, `${item.occupancyPercentage.toFixed(1)}%`])
-    );
+        ${renderSection('Berth Type Analysis', ['Berth Type', 'Total', 'Occupied', 'Booked', 'Available', 'Occupancy %'],
+          berthTypeData.map((item) => [
+            item.berthType,
+            item.totalBerths,
+            item.occupied,
+            item.booked,
+            item.available,
+            `${item.occupancyPercentage.toFixed(1)}%`,
+          ])
+        )}
 
-    addSectionTitle('Available Berths Snapshot');
-    addTable(
-      ['Berth', 'Pier', 'Type', 'Length', 'Ownership'],
-      availableBerths.slice(0, 30).map(item => [item.berth, item.pier, item.berthType, item.nominalLength, item.ownershipType])
-    );
+        ${renderSection('Available Berths Snapshot', ['Berth', 'Pier', 'Type', 'Length', 'Ownership'],
+          availableBerths.slice(0, 30).map((item) => [item.berth, String(item.pier), item.berthType, item.nominalLength, item.ownershipType])
+        )}
 
-    addSectionTitle('Future Bookings and Rentals');
-    addTable(
-      ['Status', 'Berth', 'Pier', 'Customer', 'Date In', 'Date Out'],
-      futureRecords.slice(0, 30).map(item => [
-        item.occupancyStatus,
-        item.berth,
-        item.pier,
-        item.customerName || '-',
-        item.dateIn ? item.dateIn.toLocaleDateString('en-NZ') : '-',
-        item.dateOut ? item.dateOut.toLocaleDateString('en-NZ') : '-',
-      ])
-    );
+        ${renderSection('Future Bookings and Rentals', ['Status', 'Berth', 'Pier', 'Customer', 'Date In', 'Date Out'],
+          futureRecords.slice(0, 30).map((item) => [
+            item.occupancyStatus,
+            item.berth,
+            String(item.pier),
+            item.customerName || '-',
+            item.dateIn ? item.dateIn.toLocaleDateString('en-NZ') : '-',
+            item.dateOut ? item.dateOut.toLocaleDateString('en-NZ') : '-',
+          ])
+        )}
 
-    addSectionTitle('Customer Age Statistics');
-    addTable(
-      ['Age Band', 'Customer Count', 'Share %'],
-      customerAgeData.map(item => [item.ageBand, item.customerCount, `${item.percentage.toFixed(1)}%`])
-    );
+        ${renderSection('Customer Age Statistics', ['Age Band', 'Customer Count', 'Share %'],
+          customerAgeData.map((item) => [item.ageBand, item.customerCount, `${item.percentage.toFixed(1)}%`])
+        )}
+      </body>
+      </html>
+    `;
 
-    const totalPages = doc.getNumberOfPages();
-    for (let page = 1; page <= totalPages; page++) {
-      doc.setPage(page);
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8);
-      doc.setTextColor(100, 116, 139);
-      doc.text(`Page ${page} of ${totalPages}`, pageWidth - 34, doc.internal.pageSize.getHeight() - 6);
+    const printWindow = window.open('', '_blank', 'noopener,noreferrer,width=1200,height=900');
+    if (!printWindow) {
+      window.alert('Unable to open print preview. Please allow pop-ups for this site.');
+      return;
     }
 
-    const fileDate = reportDate.toISOString().slice(0, 10);
-    doc.save(`westhaven-master-summary-${fileDate}.pdf`);
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
   };
 
   const reportTypes = [
