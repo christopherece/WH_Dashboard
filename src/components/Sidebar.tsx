@@ -29,7 +29,11 @@ export default function Sidebar({ currentPage, onPageChange }: SidebarProps) {
   return (
     <aside className="w-full shrink-0 bg-navy-900 text-white md:sticky md:top-0 md:h-screen md:w-64 md:flex md:flex-col">
       <div className="border-b border-navy-800 px-5 py-4 md:p-6">
-        <h1 className="text-lg font-bold tracking-tight md:text-xl">Westhaven Marina</h1>
+        <img
+          src="/getsitelogo.png"
+          alt="Westhaven Marina"
+          className="h-11 w-auto max-w-full rounded-md object-cover"
+        />
         <p className="mt-1 text-xs text-navy-300 md:text-sm">Occupancy & Berth Dashboard</p>
       </div>
       
