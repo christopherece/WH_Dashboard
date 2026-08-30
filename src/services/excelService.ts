@@ -162,7 +162,7 @@ export class ExcelService {
           rentalAgreementId: this.parseNullableString(this.getFirstValue(normalizedRow, ['RentalAgreementID'])),
           bookingId: this.parseNullableString(this.getFirstValue(normalizedRow, ['BookingID'])),
           dateIn: this.parseDate(this.getFirstValue(normalizedRow, ['DateIn'])),
-          dateOut: this.parseDate(this.getFirstValue(normalizedRow, ['DateOut'])),
+          dateOut: this.parseDateForEndDate(this.getFirstValue(normalizedRow, ['DateOut'])),
           bookingEnteredDate: this.parseDate(this.getFirstValue(normalizedRow, ['BookingEnteredDate'])),
           customerId: this.parseNullableString(this.getFirstValue(normalizedRow, ['CustomerID'])),
           customerName: this.parseNullableString(this.getFirstValue(normalizedRow, ['CustomerName'])),
@@ -330,20 +330,22 @@ export class ExcelService {
     // If it's already a number, return it
     if (typeof value === 'number') return value;
     // If it's a string that can be converted to a number, convert it
-    const num = Number(value);
-    if (!isNaN(num) && value !== '') return num;
+    const trimmed = String(value).trim();
+    const num = Number(trimmed);
+    if (!isNaN(num) && trimmed !== '') return num;
     // Otherwise return as string
-    return String(value);
+    return trimmed;
   }
 
   private parseString(value: any): string {
     if (value === null || value === undefined || value === 'NULL') return '';
-    return String(value);
+    return String(value).trim().replace(/\s+/g, ' ');
   }
 
   private parseNullableString(value: any): string | null {
     if (value === null || value === undefined || value === 'NULL' || value === '') return null;
-    return String(value);
+    const trimmed = String(value).trim().replace(/\s+/g, ' ');
+    return trimmed || null;
   }
 
   private parseRequiredFlag(value: any): boolean {
@@ -353,11 +355,37 @@ export class ExcelService {
   }
 
   private parseDate(value: any): Date | null {
+    return this.parseDateFromValue(value, false);
+  }
+
+  private parseDateForEndDate(value: any): Date | null {
+    return this.parseDateFromValue(value, true);
+  }
+
+  private parseDateFromValue(value: any, preferNextDayNearMidnight: boolean): Date | null {
     if (value === null || value === undefined) return null;
 
     if (typeof value === 'string') {
       const trimmed = value.trim();
       if (!trimmed || ['NULL', 'N/A', 'NA', 'UNKNOWN'].includes(trimmed.toUpperCase())) return null;
+
+      const dateOnlyMatch = trimmed.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+      if (dateOnlyMatch) {
+        const year = Number(dateOnlyMatch[1]);
+        const month = Number(dateOnlyMatch[2]);
+        const day = Number(dateOnlyMatch[3]);
+        const localDate = new Date(year, month - 1, day);
+        return Number.isNaN(localDate.getTime()) ? null : localDate;
+      }
+
+      const nzDateMatch = trimmed.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+      if (nzDateMatch) {
+        const day = Number(nzDateMatch[1]);
+        const month = Number(nzDateMatch[2]);
+        const year = Number(nzDateMatch[3]);
+        const localDate = new Date(year, month - 1, day);
+        return Number.isNaN(localDate.getTime()) ? null : localDate;
+      }
 
       const date = new Date(trimmed);
       return isNaN(date.getTime()) ? null : date;
@@ -365,9 +393,11 @@ export class ExcelService {
 
     if (typeof value === 'number') {
       if (!Number.isFinite(value) || value === 0) return null;
-      // Excel stores dates as day serials. Parse their calendar components directly
-      // to avoid daylight-saving offsets changing the displayed date.
-      const excelDate = XLSX.SSF.parse_date_code(value);
+      // Excel stores dates as day serials, sometimes with a fractional time near midnight.
+      // For end-date display fields we move values that are essentially midnight to the next day,
+      // but leave normal date comparisons and reversion dates untouched.
+      const serial = preferNextDayNearMidnight && value % 1 > 0.9 ? Math.ceil(value) : Math.floor(value);
+      const excelDate = XLSX.SSF.parse_date_code(serial);
       return excelDate ? new Date(excelDate.y, excelDate.m - 1, excelDate.d) : null;
     }
 
