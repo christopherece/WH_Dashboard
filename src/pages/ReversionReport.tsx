@@ -44,7 +44,8 @@ export default function ReversionReport({ onRefresh }: ReversionReportProps) {
   const [showOwnershipOptions, setShowOwnershipOptions] = useState(false);
   const [berthTypeFilter, setBerthTypeFilter] = useState<string[]>([]);
   const [showBerthTypeOptions, setShowBerthTypeOptions] = useState(false);
-  const [lengthFilter, setLengthFilter] = useState<number | null>(null);
+  const [lengthFilter, setLengthFilter] = useState<number[]>([]);
+  const [showLengthOptions, setShowLengthOptions] = useState(false);
   const [occupancyFilter, setOccupancyFilter] = useState('all');
   const [includeBookedInOccupancy, setIncludeBookedInOccupancy] = useState(false);
   const [pendingByLength, setPendingByLength] = useState<Record<number, number>>({});
@@ -84,6 +85,9 @@ export default function ReversionReport({ onRefresh }: ReversionReportProps) {
     [data]
   );
   const occupancyStatuses = useMemo(() => ['Occupied', 'Vacant', 'Booked'], []);
+  const allOwnershipSelected = ownershipTypes.length > 0 && ownershipTypes.every((value) => ownershipFilter.includes(value));
+  const allBerthTypesSelected = berthTypes.length > 0 && berthTypes.every((value) => berthTypeFilter.includes(value));
+  const allLengthsSelected = berthLengths.length > 0 && berthLengths.every((value) => lengthFilter.includes(value));
 
   const baseFilteredData = useMemo(
     () =>
@@ -105,7 +109,7 @@ export default function ReversionReport({ onRefresh }: ReversionReportProps) {
         return (
           (!ownershipFilter.length || ownershipFilter.includes(item.ownershipType)) &&
           (!berthTypeFilter.length || berthTypeFilter.includes(item.berthType)) &&
-          (lengthFilter === null || Math.round(item.berthLength) === lengthFilter) &&
+          (!lengthFilter.length || lengthFilter.includes(Math.round(item.berthLength))) &&
           (!searchText.trim() || searchTarget.includes(searchText.toLowerCase().trim()))
         );
       }),
@@ -385,6 +389,16 @@ export default function ReversionReport({ onRefresh }: ReversionReportProps) {
             </button>
             {showOwnershipOptions && (
               <div className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-gray-300 bg-white p-2 shadow-lg">
+                <label className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm font-medium text-gray-800 hover:bg-gray-50">
+                  <input
+                    type="checkbox"
+                    checked={allOwnershipSelected}
+                    onChange={(event) => setOwnershipFilter(event.target.checked ? [...ownershipTypes] : [])}
+                    className="form-checkbox"
+                  />
+                  Select all
+                </label>
+                <div className="my-1 border-t border-gray-200" />
                 {ownershipTypes.map((value) => (
                   <label key={value} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm text-gray-700 hover:bg-gray-50">
                     <input
@@ -428,6 +442,16 @@ export default function ReversionReport({ onRefresh }: ReversionReportProps) {
             </button>
             {showBerthTypeOptions && (
               <div className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-gray-300 bg-white p-2 shadow-lg">
+                <label className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm font-medium text-gray-800 hover:bg-gray-50">
+                  <input
+                    type="checkbox"
+                    checked={allBerthTypesSelected}
+                    onChange={(event) => setBerthTypeFilter(event.target.checked ? [...berthTypes] : [])}
+                    className="form-checkbox"
+                  />
+                  Select all
+                </label>
+                <div className="my-1 border-t border-gray-200" />
                 {berthTypes.map((value) => (
                   <label key={value} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm text-gray-700 hover:bg-gray-50">
                     <input
@@ -456,19 +480,61 @@ export default function ReversionReport({ onRefresh }: ReversionReportProps) {
             )}
           </div>
 
-          <select
-            value={lengthFilter === null ? 'all' : String(lengthFilter)}
-            onChange={(event) => setLengthFilter(event.target.value === 'all' ? null : Number(event.target.value))}
-            className="select"
-          >
-            <option value="all">All lengths</option>
-            {berthLengths.map((length) => (
-              <option key={length} value={length}>{length} m</option>
-            ))}
-          </select>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowLengthOptions((show) => !show)}
+              className="select flex w-full items-center justify-between text-left"
+            >
+              <span className="truncate">
+                {lengthFilter.length
+                  ? `${lengthFilter.length} length${lengthFilter.length === 1 ? '' : 's'} selected`
+                  : 'All Lengths'}
+              </span>
+              <span className="ml-2">v</span>
+            </button>
+            {showLengthOptions && (
+              <div className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-gray-300 bg-white p-2 shadow-lg">
+                <label className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm font-medium text-gray-800 hover:bg-gray-50">
+                  <input
+                    type="checkbox"
+                    checked={allLengthsSelected}
+                    onChange={(event) => setLengthFilter(event.target.checked ? [...berthLengths] : [])}
+                    className="form-checkbox"
+                  />
+                  Select all
+                </label>
+                <div className="my-1 border-t border-gray-200" />
+                {berthLengths.map((length) => (
+                  <label key={length} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm text-gray-700 hover:bg-gray-50">
+                    <input
+                      type="checkbox"
+                      checked={lengthFilter.includes(length)}
+                      onChange={() =>
+                        setLengthFilter((selected) =>
+                          selected.includes(length)
+                            ? selected.filter((item) => item !== length)
+                            : [...selected, length].sort((a, b) => a - b)
+                        )
+                      }
+                      className="form-checkbox"
+                    />
+                    {length} m
+                  </label>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setLengthFilter([])}
+                  className="mt-2 w-full border-t border-gray-200 pt-2 text-sm text-navy-600 hover:text-navy-800"
+                >
+                  Clear lengths
+                </button>
+              </div>
+            )}
+          </div>
 
           <select value={occupancyFilter} onChange={(event) => setOccupancyFilter(event.target.value)} className="select">
-            <option value="all">All occupancy statuses</option>
+            <option value="all">Select all occupancy statuses</option>
             {occupancyStatuses.map((status) => (
               <option key={status} value={status}>{status}</option>
             ))}
@@ -487,7 +553,7 @@ export default function ReversionReport({ onRefresh }: ReversionReportProps) {
             onClick={() => {
               setOwnershipFilter(['WEMT 2026', 'WEMT ACC 2026']);
               setBerthTypeFilter([]);
-              setLengthFilter(null);
+              setLengthFilter([]);
               setOccupancyFilter('all');
               setIncludeBookedInOccupancy(false);
               setPendingByLength({});
