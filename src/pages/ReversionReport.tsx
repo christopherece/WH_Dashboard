@@ -24,10 +24,12 @@ type SortKey =
 
 const ENDING_OWNERSHIP_TYPES = new Set(['WEMT 2026', 'WEMT ACC 2026']);
 
-const isOccupiedLike = (status: string) => {
+const isStrictOccupied = (status: string) => {
   const normalized = status.toLowerCase();
-  return normalized === 'occupied' || normalized === 'booked' || normalized === 'rented';
+  return normalized === 'occupied' || normalized === 'rented';
 };
+
+const isBooked = (status: string) => status.toLowerCase() === 'booked';
 
 const isVacantLike = (status: string) => {
   const normalized = status.toLowerCase();
@@ -44,6 +46,8 @@ export default function ReversionReport({ onRefresh }: ReversionReportProps) {
   const [showBerthTypeOptions, setShowBerthTypeOptions] = useState(false);
   const [lengthFilter, setLengthFilter] = useState<number | null>(null);
   const [occupancyFilter, setOccupancyFilter] = useState('all');
+  const [includeBookedInOccupancy, setIncludeBookedInOccupancy] = useState(false);
+  const [pendingByLength, setPendingByLength] = useState<Record<number, number>>({});
   const [searchText, setSearchText] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('pier');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
@@ -152,17 +156,27 @@ export default function ReversionReport({ onRefresh }: ReversionReportProps) {
   const summary = useMemo(
     () => ({
       total: displayData.length,
-      occupied: displayData.filter((item) => isOccupiedLike(item.occupancyStatus)).length,
+      occupied: displayData.filter((item) =>
+        isStrictOccupied(item.occupancyStatus) || (includeBookedInOccupancy && isBooked(item.occupancyStatus))
+      ).length,
       booked: displayData.filter((item) => item.occupancyStatus.toLowerCase() === 'booked').length,
       vacant: displayData.filter((item) => isVacantLike(item.occupancyStatus)).length,
     }),
-    [displayData]
+    [displayData, includeBookedInOccupancy]
+  );
+
+  const overallOccupancyPercent = useMemo(
+    () => {
+      const totalPending = Object.values(pendingByLength).reduce((sum, value) => sum + (Number(value) || 0), 0);
+      return summary.total ? ((summary.occupied + totalPending) / summary.total) * 100 : 0;
+    },
+    [summary, pendingByLength]
   );
 
   const sizeAvailability = useMemo(() => {
     const byLength = new Map<
       number,
-      { length: number; total: number; occupied: number; available: number; availableBerths: string[] }
+      { length: number; total: number; occupied: number; booked: number; available: number; availableBerths: string[] }
     >();
 
     baseFilteredData.forEach((item) => {
@@ -173,12 +187,14 @@ export default function ReversionReport({ onRefresh }: ReversionReportProps) {
         length,
         total: 0,
         occupied: 0,
+        booked: 0,
         available: 0,
         availableBerths: [],
       };
 
       current.total++;
-      if (isOccupiedLike(item.occupancyStatus)) current.occupied++;
+      if (isStrictOccupied(item.occupancyStatus)) current.occupied++;
+      if (item.occupancyStatus.toLowerCase() === 'booked') current.booked++;
 
       if (isVacantLike(item.occupancyStatus)) {
         current.available++;
@@ -191,11 +207,15 @@ export default function ReversionReport({ onRefresh }: ReversionReportProps) {
     return [...byLength.values()]
       .map((item) => ({
         ...item,
-        occupancyPercent: item.total ? (item.occupied / item.total) * 100 : 0,
+        pendingCount: Math.min(pendingByLength[item.length] || 0, item.available),
+        adjustedAvailable: Math.max(item.available - Math.min(pendingByLength[item.length] || 0, item.available), 0),
+        projectedOccupancyPercent: item.total
+          ? ((item.occupied + (includeBookedInOccupancy ? item.booked : 0) + Math.min(pendingByLength[item.length] || 0, item.available)) / item.total) * 100
+          : 0,
         availableBerths: [...new Set(item.availableBerths)],
       }))
       .sort((a, b) => a.length - b.length);
-  }, [baseFilteredData]);
+  }, [baseFilteredData, includeBookedInOccupancy, pendingByLength]);
 
   const reversionAnalysis = useMemo(() => {
     const isDate = (date: Date | null, year: number, month: number, day: number) =>
@@ -294,10 +314,10 @@ export default function ReversionReport({ onRefresh }: ReversionReportProps) {
         Snapshot note: this report is intended to show the position at 30 Sep 2026 and assumes no active Future Rental or Future Booking lines are included.
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         {[
           ['Total Active RMA', summary.total, 'text-gray-900'],
-          ['Occupied incl. Booked', summary.occupied, 'text-green-600'],
+          [includeBookedInOccupancy ? 'Occupied (Incl Booked)' : 'Occupied', summary.occupied, 'text-green-600'],
           ['Booked', summary.booked, 'text-blue-600'],
           ['Vacant', summary.vacant, 'text-yellow-600'],
         ].map(([label, value, colour]) => (
@@ -469,6 +489,8 @@ export default function ReversionReport({ onRefresh }: ReversionReportProps) {
               setBerthTypeFilter([]);
               setLengthFilter(null);
               setOccupancyFilter('all');
+              setIncludeBookedInOccupancy(false);
+              setPendingByLength({});
               setSearchText('');
             }}
             className="btn btn-secondary"
@@ -481,13 +503,38 @@ export default function ReversionReport({ onRefresh }: ReversionReportProps) {
       <div className="card">
         <div className="card-header">
           <h2 className="card-title">Availability by Berth Size</h2>
-          <p className="text-sm text-gray-600">Counts reflect the active filters.</p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-gray-600">Counts reflect the active filters.</p>
+            <div className="flex flex-wrap items-center gap-3 text-sm text-gray-700">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={includeBookedInOccupancy}
+                  onChange={(event) => setIncludeBookedInOccupancy(event.target.checked)}
+                  className="form-checkbox"
+                />
+                Include booked in occupancy
+              </label>
+              <span className="rounded-full bg-slate-100 px-4 py-2 text-base font-semibold text-slate-700 shadow-sm">
+                Overall occupancy: {overallOccupancyPercent.toFixed(1)}%
+              </span>
+            </div>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                {['Berth Size', 'Total', 'Occupied', 'Available', 'Occupancy %', 'Available Piers'].map((heading) => (
+                {[
+                  'Berth Size',
+                  'Total',
+                  'Occupied',
+                  'Booked',
+                  'Available',
+                  'Pending',
+                  'Projected Occupancy %',
+                  'Available Piers',
+                ].map((heading) => (
                   <th key={heading} className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">{heading}</th>
                 ))}
               </tr>
@@ -498,8 +545,29 @@ export default function ReversionReport({ onRefresh }: ReversionReportProps) {
                   <td className="px-4 py-3 text-sm font-medium text-gray-900">{item.length} m</td>
                   <td className="px-4 py-3 text-sm text-gray-700">{item.total}</td>
                   <td className="px-4 py-3 text-sm text-red-700">{item.occupied}</td>
-                  <td className="px-4 py-3 text-sm text-green-700">{item.available}</td>
-                  <td className="px-4 py-3 text-sm text-blue-700">{item.occupancyPercent.toFixed(1)}%</td>
+                  <td className="px-4 py-3 text-sm text-blue-700">{item.booked}</td>
+                  <td className="px-4 py-3 text-sm text-green-700">{item.adjustedAvailable}</td>
+                  <td className="px-4 py-3 text-sm text-gray-700">
+                    <input
+                      type="number"
+                      min={0}
+                      max={item.available}
+                      step={1}
+                      value={pendingByLength[item.length] ?? ''}
+                      onChange={(event) => {
+                        const rawValue = event.target.value;
+                        setPendingByLength((current) => ({
+                          ...current,
+                          [item.length]: rawValue === ''
+                            ? 0
+                            : Math.min(item.available, Math.max(0, Number(rawValue))),
+                        }));
+                      }}
+                      placeholder="0"
+                      className="input w-24"
+                    />
+                  </td>
+                  <td className="px-4 py-3 text-sm font-medium text-purple-700">{item.projectedOccupancyPercent.toFixed(1)}%</td>
                   <td className="px-4 py-3 text-sm text-gray-700">{item.availableBerths.length ? item.availableBerths.join(', ') : '-'}</td>
                 </tr>
               ))}
