@@ -24,6 +24,16 @@ type SortKey =
 
 const ENDING_OWNERSHIP_TYPES = new Set(['WEMT 2026', 'WEMT ACC 2026']);
 
+const isOccupiedLike = (status: string) => {
+  const normalized = status.toLowerCase();
+  return normalized === 'occupied' || normalized === 'booked' || normalized === 'rented';
+};
+
+const isVacantLike = (status: string) => {
+  const normalized = status.toLowerCase();
+  return normalized === 'vacant' || normalized === 'available';
+};
+
 export default function ReversionReport({ onRefresh }: ReversionReportProps) {
   const [data, setData] = useState<ReversionRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,12 +79,9 @@ export default function ReversionReport({ onRefresh }: ReversionReportProps) {
       ),
     [data]
   );
-  const occupancyStatuses = useMemo(
-    () => [...new Set(data.map((item) => item.occupancyStatus).filter(Boolean))].sort(),
-    [data]
-  );
+  const occupancyStatuses = useMemo(() => ['Occupied', 'Vacant', 'Booked'], []);
 
-  const displayData = useMemo(
+  const baseFilteredData = useMemo(
     () =>
       data.filter((item) => {
         const searchTarget = [
@@ -95,11 +102,15 @@ export default function ReversionReport({ onRefresh }: ReversionReportProps) {
           (!ownershipFilter.length || ownershipFilter.includes(item.ownershipType)) &&
           (!berthTypeFilter.length || berthTypeFilter.includes(item.berthType)) &&
           (lengthFilter === null || Math.round(item.berthLength) === lengthFilter) &&
-          (occupancyFilter === 'all' || item.occupancyStatus === occupancyFilter) &&
           (!searchText.trim() || searchTarget.includes(searchText.toLowerCase().trim()))
         );
       }),
-    [data, ownershipFilter, berthTypeFilter, lengthFilter, occupancyFilter, searchText]
+    [data, ownershipFilter, berthTypeFilter, lengthFilter, searchText]
+  );
+
+  const displayData = useMemo(
+    () => baseFilteredData.filter((item) => occupancyFilter === 'all' || item.occupancyStatus === occupancyFilter),
+    [baseFilteredData, occupancyFilter]
   );
 
   const sortedDisplayData = useMemo(() => {
@@ -141,8 +152,9 @@ export default function ReversionReport({ onRefresh }: ReversionReportProps) {
   const summary = useMemo(
     () => ({
       total: displayData.length,
-      occupied: displayData.filter((item) => item.occupancyStatus.toLowerCase() === 'occupied').length,
-      vacant: displayData.filter((item) => item.occupancyStatus.toLowerCase() === 'vacant').length,
+      occupied: displayData.filter((item) => isOccupiedLike(item.occupancyStatus)).length,
+      booked: displayData.filter((item) => item.occupancyStatus.toLowerCase() === 'booked').length,
+      vacant: displayData.filter((item) => isVacantLike(item.occupancyStatus)).length,
     }),
     [displayData]
   );
@@ -153,7 +165,7 @@ export default function ReversionReport({ onRefresh }: ReversionReportProps) {
       { length: number; total: number; occupied: number; available: number; availableBerths: string[] }
     >();
 
-    displayData.forEach((item) => {
+    baseFilteredData.forEach((item) => {
       const length = Math.round(item.berthLength);
       if (!length) return;
 
@@ -166,9 +178,9 @@ export default function ReversionReport({ onRefresh }: ReversionReportProps) {
       };
 
       current.total++;
-      if (item.occupancyStatus.toLowerCase() === 'occupied') current.occupied++;
+      if (isOccupiedLike(item.occupancyStatus)) current.occupied++;
 
-      if (item.occupancyStatus.toLowerCase() === 'vacant') {
+      if (isVacantLike(item.occupancyStatus)) {
         current.available++;
         current.availableBerths.push(`Pier ${item.pier}`);
       }
@@ -183,7 +195,7 @@ export default function ReversionReport({ onRefresh }: ReversionReportProps) {
         availableBerths: [...new Set(item.availableBerths)],
       }))
       .sort((a, b) => a.length - b.length);
-  }, [displayData]);
+  }, [baseFilteredData]);
 
   const reversionAnalysis = useMemo(() => {
     const isDate = (date: Date | null, year: number, month: number, day: number) =>
@@ -285,7 +297,8 @@ export default function ReversionReport({ onRefresh }: ReversionReportProps) {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {[
           ['Total Active RMA', summary.total, 'text-gray-900'],
-          ['Occupied', summary.occupied, 'text-green-600'],
+          ['Occupied incl. Booked', summary.occupied, 'text-green-600'],
+          ['Booked', summary.booked, 'text-blue-600'],
           ['Vacant', summary.vacant, 'text-yellow-600'],
         ].map(([label, value, colour]) => (
           <div className="card" key={label as string}>
