@@ -9,8 +9,8 @@ export function filterData(data: BerthRecord[], filters: FilterState): BerthReco
     if (filters.marina && record.marina !== filters.marina) return false;
     if (filters.pier && record.pier !== filters.pier) return false;
     if (filters.berth && record.berth !== filters.berth) return false;
-    if (filters.berthType && record.berthType !== filters.berthType) return false;
-    if (filters.ownershipType && record.ownershipType !== filters.ownershipType) return false;
+    if (filters.berthType && filters.berthType.length > 0 && !filters.berthType.includes(record.berthType)) return false;
+    if (filters.ownershipType && filters.ownershipType.length > 0 && !filters.ownershipType.includes(record.ownershipType)) return false;
     if (filters.occupancyStatus && record.occupancyStatus !== filters.occupancyStatus) return false;
     if (filters.berthSize && record.nominalLength !== filters.berthSize) return false;
     return true;

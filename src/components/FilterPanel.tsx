@@ -18,6 +18,8 @@ const OCCUPANCY_STATUSES = ['Available', 'Rented', 'Booked', 'Future Booking', '
 
 export default function FilterPanel({ filters, onFilterChange, onClearFilters, uniqueValues }: FilterPanelProps) {
   const [isExpanded, setIsExpanded] = useState(true);
+  const [showBerthTypeOptions, setShowBerthTypeOptions] = useState(false);
+  const [showOwnershipTypeOptions, setShowOwnershipTypeOptions] = useState(false);
 
   const handleFilterChange = (key: keyof FilterState, value: any) => {
     onFilterChange({
@@ -26,7 +28,10 @@ export default function FilterPanel({ filters, onFilterChange, onClearFilters, u
     });
   };
 
-  const activeFilterCount = Object.values(filters).filter(v => v !== null && v !== undefined).length;
+  const activeFilterCount = Object.values(filters).filter((value) => {
+    if (Array.isArray(value)) return value.length > 0;
+    return value !== null && value !== undefined;
+  }).length;
 
   return (
     <div className="card">
@@ -80,33 +85,95 @@ export default function FilterPanel({ filters, onFilterChange, onClearFilters, u
           </div>
 
           {/* Berth Type */}
-          <div>
+          <div className="relative">
             <label className="block text-sm font-medium text-gray-700 mb-1">Berth Type</label>
-            <select
-              value={filters.berthType || ''}
-              onChange={(e) => handleFilterChange('berthType', e.target.value || null)}
-              className="select"
+            <button
+              type="button"
+              onClick={() => setShowBerthTypeOptions((show) => !show)}
+              className="select flex w-full items-center justify-between text-left"
             >
-              <option value="">All Types</option>
-              {uniqueValues.berthTypes.map((type) => (
-                <option key={type} value={type}>{type}</option>
-              ))}
-            </select>
+              <span className="truncate">
+                {filters.berthType && filters.berthType.length > 0
+                  ? `${filters.berthType.length} berth type${filters.berthType.length === 1 ? '' : 's'} selected`
+                  : 'All Types'}
+              </span>
+              <span className="ml-2">v</span>
+            </button>
+
+            {showBerthTypeOptions && (
+              <div className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-gray-300 bg-white p-2 shadow-lg">
+                {uniqueValues.berthTypes.map((type) => (
+                  <label key={type} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm text-gray-700 hover:bg-gray-50">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(filters.berthType?.includes(type))}
+                      onChange={() => {
+                        const currentTypes = filters.berthType || [];
+                        const nextTypes = currentTypes.includes(type)
+                          ? currentTypes.filter((item) => item !== type)
+                          : [...currentTypes, type];
+                        handleFilterChange('berthType', nextTypes.length > 0 ? nextTypes : null);
+                      }}
+                      className="form-checkbox"
+                    />
+                    {type}
+                  </label>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => handleFilterChange('berthType', null)}
+                  className="mt-2 w-full border-t border-gray-200 pt-2 text-sm text-navy-600 hover:text-navy-800"
+                >
+                  Clear berth types
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Ownership Type */}
-          <div>
+          <div className="relative">
             <label className="block text-sm font-medium text-gray-700 mb-1">Ownership Type</label>
-            <select
-              value={filters.ownershipType || ''}
-              onChange={(e) => handleFilterChange('ownershipType', e.target.value || null)}
-              className="select"
+            <button
+              type="button"
+              onClick={() => setShowOwnershipTypeOptions((show) => !show)}
+              className="select flex w-full items-center justify-between text-left"
             >
-              <option value="">All Ownership Types</option>
-              {uniqueValues.ownershipTypes.map((type) => (
-                <option key={type} value={type}>{type}</option>
-              ))}
-            </select>
+              <span className="truncate">
+                {filters.ownershipType && filters.ownershipType.length > 0
+                  ? `${filters.ownershipType.length} ownership type${filters.ownershipType.length === 1 ? '' : 's'} selected`
+                  : 'All Ownership Types'}
+              </span>
+              <span className="ml-2">v</span>
+            </button>
+
+            {showOwnershipTypeOptions && (
+              <div className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-gray-300 bg-white p-2 shadow-lg">
+                {uniqueValues.ownershipTypes.map((type) => (
+                  <label key={type} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm text-gray-700 hover:bg-gray-50">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(filters.ownershipType?.includes(type))}
+                      onChange={() => {
+                        const currentTypes = filters.ownershipType || [];
+                        const nextTypes = currentTypes.includes(type)
+                          ? currentTypes.filter((item) => item !== type)
+                          : [...currentTypes, type];
+                        handleFilterChange('ownershipType', nextTypes.length > 0 ? nextTypes : null);
+                      }}
+                      className="form-checkbox"
+                    />
+                    {type}
+                  </label>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => handleFilterChange('ownershipType', null)}
+                  className="mt-2 w-full border-t border-gray-200 pt-2 text-sm text-navy-600 hover:text-navy-800"
+                >
+                  Clear ownership types
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Berth Size */}
@@ -177,11 +244,17 @@ export default function FilterPanel({ filters, onFilterChange, onClearFilters, u
           {filters.pier && (
             <FilterChip label={`Pier: ${filters.pier}`} onRemove={() => handleFilterChange('pier', null)} />
           )}
-          {filters.berthType && (
-            <FilterChip label={`Type: ${filters.berthType}`} onRemove={() => handleFilterChange('berthType', null)} />
+          {filters.berthType && filters.berthType.length > 0 && (
+            <FilterChip
+              label={`Types: ${filters.berthType.join(', ')}`}
+              onRemove={() => handleFilterChange('berthType', null)}
+            />
           )}
-          {filters.ownershipType && (
-            <FilterChip label={`Ownership: ${filters.ownershipType}`} onRemove={() => handleFilterChange('ownershipType', null)} />
+          {filters.ownershipType && filters.ownershipType.length > 0 && (
+            <FilterChip
+              label={`Ownership: ${filters.ownershipType.join(', ')}`}
+              onRemove={() => handleFilterChange('ownershipType', null)}
+            />
           )}
           {filters.berthSize && (
             <FilterChip label={`Size: ${filters.berthSize}m`} onRemove={() => handleFilterChange('berthSize', null)} />

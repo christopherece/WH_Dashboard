@@ -76,8 +76,8 @@ export interface FilterState {
   marina: string | null;
   pier: string | number | null;
   berth: string | null;
-  berthType: string | null;
-  ownershipType: string | null;
+  berthType: string[] | null;
+  ownershipType: string[] | null;
   occupancyStatus: OccupancyStatus | null;
   berthSize: number | null;
 }

@@ -37,11 +37,11 @@ export default function Berths({ data, lastUpdated, onRefresh }: BerthsProps) {
     if (filters.pier) {
       result = result.filter(r => r.pier.toString() === filters.pier.toString());
     }
-    if (filters.berthType) {
-      result = result.filter(r => r.berthType === filters.berthType);
+    if (filters.berthType && filters.berthType.length > 0) {
+      result = result.filter(r => filters.berthType.includes(r.berthType));
     }
-    if (filters.ownershipType) {
-      result = result.filter(r => r.ownershipType === filters.ownershipType);
+    if (filters.ownershipType && filters.ownershipType.length > 0) {
+      result = result.filter(r => filters.ownershipType.includes(r.ownershipType));
     }
     if (filters.berthSize) {
       result = result.filter(r => r.nominalLength === filters.berthSize);
