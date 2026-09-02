@@ -1,6 +1,6 @@
 import { BerthRecord } from '../types/berth';
 import { calculatePierOccupancy } from '../utils/dataUtils';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LabelList } from 'recharts';
 
 interface PierOccupancyChartProps {
   data: BerthRecord[];
@@ -21,9 +21,9 @@ export default function PierOccupancyChart({ data }: PierOccupancyChartProps) {
         </div>
       </div>
 
-      <div className="h-[560px] w-full">
+      <div className="h-[680px] w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={pierData} layout="vertical" margin={{ top: 10, right: 18, left: 6, bottom: 10 }}>
+          <BarChart data={pierData} layout="vertical" barSize={28} margin={{ top: 10, right: 28, left: 6, bottom: 10 }}>
             <CartesianGrid strokeDasharray="4 4" stroke="#e2e8f0" horizontal={false} />
             <XAxis
               type="number"
@@ -36,7 +36,7 @@ export default function PierOccupancyChart({ data }: PierOccupancyChartProps) {
               type="category"
               tickFormatter={(value) => `Pier ${value}`}
               tick={{ fill: '#475569', fontSize: 12 }}
-              width={90}
+              width={110}
               axisLine={{ stroke: '#cbd5e1' }}
               tickLine={false}
             />
@@ -55,9 +55,33 @@ export default function PierOccupancyChart({ data }: PierOccupancyChartProps) {
               wrapperStyle={{ paddingTop: 12, fontSize: '12px' }}
               iconType="circle"
             />
-            <Bar dataKey="occupied" name="Occupied" fill="#ef4444" stackId="a" radius={[0, 6, 6, 0]} />
-            <Bar dataKey="booked" name="Booked" fill="#f59e0b" stackId="a" radius={[0, 6, 6, 0]} />
-            <Bar dataKey="available" name="Available" fill="#22c55e" stackId="a" radius={[0, 6, 6, 0]} />
+            <Bar dataKey="occupied" name="Occupied" fill="#ef4444" stackId="a" radius={[0, 6, 6, 0]}>
+              <LabelList
+                dataKey="occupied"
+                position="center"
+                fill="#fff"
+                style={{ fontSize: 13, fontWeight: 700 }}
+                formatter={(value: number) => (value > 0 ? value : '')}
+              />
+            </Bar>
+            <Bar dataKey="booked" name="Booked" fill="#f59e0b" stackId="a" radius={[0, 6, 6, 0]}>
+              <LabelList
+                dataKey="booked"
+                position="center"
+                fill="#fff"
+                style={{ fontSize: 13, fontWeight: 700 }}
+                formatter={(value: number) => (value > 0 ? value : '')}
+              />
+            </Bar>
+            <Bar dataKey="available" name="Available" fill="#22c55e" stackId="a" radius={[0, 6, 6, 0]}>
+              <LabelList
+                dataKey="available"
+                position="center"
+                fill="#fff"
+                style={{ fontSize: 13, fontWeight: 700 }}
+                formatter={(value: number) => (value > 0 ? value : '')}
+              />
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       </div>
