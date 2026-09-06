@@ -129,7 +129,7 @@ export class ExcelService {
   }
 
   private parseData(rawData: any[]): BerthRecord[] {
-    return rawData.map((row: any, index: number) => {
+    const parsedRows = rawData.map((row: any, index: number) => {
       try {
         const normalizedRow = this.normalizeRowKeys(row);
 
@@ -203,6 +203,53 @@ export class ExcelService {
         return this.getDefaultRecord();
       }
     }).filter(record => record.berthId > 0); // Filter out completely invalid records
+
+    return this.selectPrimaryBerthRows(parsedRows);
+  }
+
+  private selectPrimaryBerthRows(records: BerthRecord[]): BerthRecord[] {
+    const byBerth = new Map<number, BerthRecord>();
+
+    records.forEach((record) => {
+      const existing = byBerth.get(record.berthId);
+      if (!existing || this.compareBerthPriority(record, existing) < 0) {
+        byBerth.set(record.berthId, record);
+      }
+    });
+
+    return [...byBerth.values()];
+  }
+
+  private compareBerthPriority(a: BerthRecord, b: BerthRecord): number {
+    const aRank = this.berthRecordRank(a);
+    const bRank = this.berthRecordRank(b);
+    if (aRank !== bRank) return aRank - bRank;
+
+    const aStart = a.dateIn?.getTime() || 0;
+    const bStart = b.dateIn?.getTime() || 0;
+
+    // For current rows choose latest start; for future rows choose earliest start.
+    if (aRank <= 2) {
+      if (aStart !== bStart) return bStart - aStart;
+    } else {
+      if (aStart !== bStart) return aStart - bStart;
+    }
+
+    const aEntered = a.bookingEnteredDate?.getTime() || 0;
+    const bEntered = b.bookingEnteredDate?.getTime() || 0;
+    if (aEntered !== bEntered) return bEntered - aEntered;
+
+    return 0;
+  }
+
+  private berthRecordRank(record: BerthRecord): number {
+    const status = (record.occupancyStatus || '').toLowerCase();
+    if (status === 'rented') return 0;
+    if (status === 'booked') return 1;
+    if (status === 'available') return 2;
+    if (status === 'future rental') return 3;
+    if (status === 'future booking') return 4;
+    return 5;
   }
 
   private parseReversionData(rawData: any[]): ReversionRecord[] {

@@ -41,6 +41,11 @@ export default function BerthTable({ data, onBerthClick, showTechnicalDetails }:
       case 'status': aVal = a.occupancyStatus; bVal = b.occupancyStatus; break;
       case 'customer': aVal = a.customerName || ''; bVal = b.customerName || ''; break;
       case 'vessel': aVal = a.vesselName || ''; bVal = b.vesselName || ''; break;
+      case 'dateIn': aVal = a.dateIn?.getTime() || 0; bVal = b.dateIn?.getTime() || 0; break;
+      case 'dateOut': aVal = a.dateOut?.getTime() || 0; bVal = b.dateOut?.getTime() || 0; break;
+      case 'berthId': aVal = a.berthId; bVal = b.berthId; break;
+      case 'rentalId': aVal = a.rentalAgreementId || ''; bVal = b.rentalAgreementId || ''; break;
+      case 'bookingId': aVal = a.bookingId || ''; bVal = b.bookingId || ''; break;
       default: aVal = a.berth; bVal = b.berth;
     }
 
@@ -151,22 +156,37 @@ export default function BerthTable({ data, onBerthClick, showTechnicalDetails }:
               >
                 Vessel {sortColumn === 'vessel' && (sortDirection === 'asc' ? '↑' : '↓')}
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Date In
+              <th
+                onClick={() => handleSort('dateIn')}
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+              >
+                Date In {sortColumn === 'dateIn' && (sortDirection === 'asc' ? '↑' : '↓')}
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Date Out
+              <th
+                onClick={() => handleSort('dateOut')}
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+              >
+                Date Out {sortColumn === 'dateOut' && (sortDirection === 'asc' ? '↑' : '↓')}
               </th>
               {showTechnicalDetails && (
                 <>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Berth ID
+                  <th
+                    onClick={() => handleSort('berthId')}
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  >
+                    Berth ID {sortColumn === 'berthId' && (sortDirection === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Rental ID
+                  <th
+                    onClick={() => handleSort('rentalId')}
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  >
+                    Rental ID {sortColumn === 'rentalId' && (sortDirection === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Booking ID
+                  <th
+                    onClick={() => handleSort('bookingId')}
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  >
+                    Booking ID {sortColumn === 'bookingId' && (sortDirection === 'asc' ? '↑' : '↓')}
                   </th>
                 </>
               )}
