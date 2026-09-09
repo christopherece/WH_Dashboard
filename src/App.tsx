@@ -18,8 +18,9 @@ import MarinaMap from './pages/MarinaMap';
 import CustomerHeatMap from './pages/CustomerHeatMap';
 import CustomerAgeReport from './pages/CustomerAgeReport';
 import ReversionReport from './pages/ReversionReport';
+import Sep30Report from './pages/Sep30Report';
 
-type Page = 'dashboard' | 'future' | 'future-bookings' | 'marina-map' | 'customer-heatmap' | 'customer-age' | 'monthly' | 'berths' | 'ownership' | 'reports' | 'quality' | 'compliance' | 'reversion';
+type Page = 'dashboard' | 'future' | 'future-bookings' | 'marina-map' | 'customer-heatmap' | 'customer-age' | 'monthly' | 'berths' | 'ownership' | 'reports' | 'quality' | 'compliance' | 'reversion' | 'sep30';
 
 function App() {
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
@@ -110,6 +111,8 @@ function App() {
         return <VesselComplianceReport data={data} lastUpdated={lastUpdated} onRefresh={handleRefresh} />;
       case 'reversion':
         return <ReversionReport onRefresh={handleRefresh} />;
+      case 'sep30':
+        return <Sep30Report onRefresh={handleRefresh} />;
       default:
         return <Dashboard {...commonProps} />;
     }

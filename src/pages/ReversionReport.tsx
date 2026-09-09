@@ -5,6 +5,9 @@ import { exportToCSV } from '../utils/dataUtils';
 
 interface ReversionReportProps {
   onRefresh: () => void;
+  title?: string;
+  subtitle?: string;
+  dataLoader?: () => Promise<ReversionRecord[]>;
 }
 
 type SortDirection = 'asc' | 'desc';
@@ -36,7 +39,15 @@ const isVacantLike = (status: string) => {
   return normalized === 'vacant' || normalized === 'available';
 };
 
-export default function ReversionReport({ onRefresh }: ReversionReportProps) {
+const DEFAULT_REVERSION_TITLE = 'Reversion Master Query Report';
+const DEFAULT_REVERSION_SUBTITLE = 'Source: ReversionMasterQuery.xlsx';
+
+export default function ReversionReport({
+  onRefresh,
+  title = DEFAULT_REVERSION_TITLE,
+  subtitle = DEFAULT_REVERSION_SUBTITLE,
+  dataLoader = async () => excelService.loadReversionData(),
+}: ReversionReportProps) {
   const [data, setData] = useState<ReversionRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -157,17 +168,42 @@ export default function ReversionReport({ onRefresh }: ReversionReportProps) {
     });
   }, [displayData, sortDirection, sortKey]);
 
-  const summary = useMemo(
-    () => ({
+  const summary = useMemo(() => {
+    const berthKey = (item: ReversionRecord) => `${item.pier ?? ''}-${item.berth ?? ''}`;
+    const startCutoff = new Date(2026, 8, 30);
+
+    const occupiedKeys = new Set(
+      displayData
+        .filter((item) => {
+          const hasActiveStartDate = item.rentalStartDate instanceof Date && !Number.isNaN(item.rentalStartDate.getTime())
+            ? item.rentalStartDate >= startCutoff
+            : false;
+
+          return hasActiveStartDate && (
+            isStrictOccupied(item.occupancyStatus) ||
+            (includeBookedInOccupancy && isBooked(item.occupancyStatus))
+          );
+        })
+        .map(berthKey)
+    );
+
+    const bookedKeys = new Set(
+      displayData
+        .filter((item) => item.occupancyStatus.toLowerCase() === 'booked' && item.rentalStartDate && item.rentalStartDate >= startCutoff)
+        .map(berthKey)
+    );
+
+    const vacantKeys = new Set(
+      displayData.filter((item) => isVacantLike(item.occupancyStatus)).map(berthKey)
+    );
+
+    return {
       total: displayData.length,
-      occupied: displayData.filter((item) =>
-        isStrictOccupied(item.occupancyStatus) || (includeBookedInOccupancy && isBooked(item.occupancyStatus))
-      ).length,
-      booked: displayData.filter((item) => item.occupancyStatus.toLowerCase() === 'booked').length,
-      vacant: displayData.filter((item) => isVacantLike(item.occupancyStatus)).length,
-    }),
-    [displayData, includeBookedInOccupancy]
-  );
+      occupied: occupiedKeys.size,
+      booked: bookedKeys.size,
+      vacant: vacantKeys.size,
+    };
+  }, [displayData, includeBookedInOccupancy]);
 
   const overallOccupancyPercent = useMemo(
     () => {
@@ -178,17 +214,39 @@ export default function ReversionReport({ onRefresh }: ReversionReportProps) {
   );
 
   const sizeAvailability = useMemo(() => {
-    const byLength = new Map<
+    const startCutoff = new Date(2026, 8, 30);
+    const berthStateByLength = new Map<
       number,
       { length: number; total: number; occupied: number; booked: number; available: number; availableBerths: string[] }
     >();
+    const uniqueBerths = new Map<string, { length: number; state: 'occupied' | 'booked' | 'available' }>();
 
     baseFilteredData.forEach((item) => {
       const length = Math.round(item.berthLength);
       if (!length) return;
 
-      const current = byLength.get(length) || {
-        length,
+      const berthKey = `${item.pier ?? ''}-${item.berth ?? ''}`;
+      if (!uniqueBerths.has(berthKey)) {
+        uniqueBerths.set(berthKey, { length, state: 'available' });
+      }
+
+      const currentState = uniqueBerths.get(berthKey)!;
+      const hasActiveStartDate = item.rentalStartDate instanceof Date && !Number.isNaN(item.rentalStartDate.getTime())
+        ? item.rentalStartDate >= startCutoff
+        : false;
+
+      if (hasActiveStartDate && (isStrictOccupied(item.occupancyStatus) || (includeBookedInOccupancy && isBooked(item.occupancyStatus)))) {
+        currentState.state = 'occupied';
+      } else if (hasActiveStartDate && item.occupancyStatus.toLowerCase() === 'booked') {
+        currentState.state = 'booked';
+      } else if (isVacantLike(item.occupancyStatus)) {
+        currentState.state = 'available';
+      }
+    });
+
+    uniqueBerths.forEach((value, berthKey) => {
+      const current = berthStateByLength.get(value.length) || {
+        length: value.length,
         total: 0,
         occupied: 0,
         booked: 0,
@@ -197,18 +255,17 @@ export default function ReversionReport({ onRefresh }: ReversionReportProps) {
       };
 
       current.total++;
-      if (isStrictOccupied(item.occupancyStatus)) current.occupied++;
-      if (item.occupancyStatus.toLowerCase() === 'booked') current.booked++;
-
-      if (isVacantLike(item.occupancyStatus)) {
+      if (value.state === 'occupied') current.occupied++;
+      if (value.state === 'booked') current.booked++;
+      if (value.state === 'available') {
         current.available++;
-        current.availableBerths.push(`Pier ${item.pier}`);
+        current.availableBerths.push(`Pier ${berthKey.split('-')[0]}`);
       }
 
-      byLength.set(length, current);
+      berthStateByLength.set(value.length, current);
     });
 
-    return [...byLength.values()]
+    return [...berthStateByLength.values()]
       .map((item) => ({
         ...item,
         pendingCount: Math.min(pendingByLength[item.length] || 0, item.available),

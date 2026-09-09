@@ -6,6 +6,7 @@ const EXCEL_FILE_NAMES = [
   'NewDashboardWithCompliance.xlsx',
 ];
 const REVERSION_FILE_NAME = 'ReversionMasterQuery.xlsx';
+const SEP30_REPORT_FILE_NAME = 'Sep30Report.xlsx';
 
 export interface ReversionOwnershipTerm {
   pier: string | number;
@@ -139,6 +140,39 @@ export class ExcelService {
     }
 
     return this.parseReversionData(rawData);
+  }
+
+  async loadSep30ReportData(): Promise<ReversionRecord[]> {
+    let response: Response | null = null;
+
+    try {
+      response = await fetch(`${API_URL}/api/file/${SEP30_REPORT_FILE_NAME}`);
+    } catch (error) {
+      console.warn('Failed to fetch Sep30 Report from API:', error);
+    }
+
+    if (!response?.ok) {
+      response = await fetch(`/${SEP30_REPORT_FILE_NAME}`);
+    }
+
+    if (!response?.ok) {
+      return this.loadReversionData();
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rawData = XLSX.utils.sheet_to_json(worksheet);
+
+    if (!rawData.length) {
+      throw new Error('Sep30 Report contains no data.');
+    }
+
+    return this.parseReversionData(rawData);
+  }
+
+  async loadReversionNewData(): Promise<ReversionRecord[]> {
+    return this.loadSep30ReportData();
   }
 
   async loadReversionTransitionDataFromOccupancy(): Promise<ReversionRecord[]> {
@@ -387,24 +421,72 @@ export class ExcelService {
   private parseReversionData(rawData: any[]): ReversionRecord[] {
     return rawData.map((row) => {
       const normalizedRow = this.normalizeRowKeys(row);
+      const rawOwnership = this.getFirstValue(normalizedRow, ['OwnershipType', 'Ownership', 'WEMTOwnership', 'mmprName', 'mmotDescription']);
+      const ownershipCustomerId = this.getFirstValue(normalizedRow, ['OwnershipCustomerID', 'OwnershipCustomerId', 'CustomerID', 'Customer Id', 'mmcuID', 'shCustomerID']);
+      const ownershipType = this.resolveOwnershipType(rawOwnership, ownershipCustomerId);
+
+      const ownershipDescription = this.parseString(rawOwnership).toUpperCase();
+      const trustGroup = ownershipDescription.startsWith('WEMT')
+        ? 'WEMT'
+        : ownershipDescription.startsWith('WEXT')
+          ? 'WEXT'
+          : ownershipDescription.includes('MARINA')
+            ? 'Marina Trust'
+            : 'Other';
+
+      const rentalStatus = this.parseString(this.getFirstValue(normalizedRow, ['RentalStatus', 'sdStatus', 'OccupancyStatus', 'Status']));
+      const rentalLineType = this.parseString(this.getFirstValue(normalizedRow, ['RentalLineType', 'SDLineType', 'sdLineType', 'ServiceLineType', 'ResourceLineType']));
+      const normalizedLineType = rentalLineType.toUpperCase();
+      const occupierType = (() => {
+        switch (normalizedLineType) {
+          case 'RESOURCE':
+            return 'Renter';
+          case 'RESOURCE_OWN':
+            return 'Owner Occupier';
+          case 'RESOURCE_SUB':
+            return 'Sub Renter';
+          case 'RESOURCE_PVT':
+            return 'Private Renter';
+          default:
+            return rentalLineType || 'Other';
+        }
+      })();
+
+      const occupancyStatus = !rentalStatus
+        ? 'Vacant'
+        : rentalStatus.toUpperCase() === 'BOOKED'
+          ? 'Booked'
+          : 'Occupied';
+
+      const berthOwner = this.parseNullableString(this.getFirstValue(normalizedRow, ['BerthOwner', 'Owner', 'OwnerName', 'CustomerName']));
+      const ownershipCustomer = this.parseNullableString(this.getFirstValue(normalizedRow, ['OwnershipCustomer', 'Owner', 'CustomerName', 'mmcuLongName']));
+      const owner = ownershipCustomer || berthOwner;
+      const occupier = this.parseNullableString(this.getFirstValue(normalizedRow, ['Renter', 'Occupier', 'VesselName', 'CustomerName', 'rc.mmcuLongName', 'Customer']));
+      const rentalPeriod = this.parseNullableString(this.getFirstValue(normalizedRow, ['RentalPeriod']));
+      const reversionPeriod = this.parseNullableString(this.getFirstValue(normalizedRow, ['ReversionPeriod']));
+
       return {
-        trustGroup: this.parseString(this.getFirstValue(normalizedRow, ['TrustGroup'])),
-        ownershipType: this.parseString(this.getFirstValue(normalizedRow, ['OwnershipType'])),
-        customerId: this.parseNullableString(this.getFirstValue(normalizedRow, ['CustomerID'])),
-        owner: this.parseNullableString(this.getFirstValue(normalizedRow, ['Owner'])),
-        pier: this.parseStringOrNumber(this.getFirstValue(normalizedRow, ['Pier'])),
-        berth: this.parseString(this.getFirstValue(normalizedRow, ['Berth'])),
-        berthType: this.parseString(this.getFirstValue(normalizedRow, ['BerthType'])),
-        berthLength: this.parseNumber(this.getFirstValue(normalizedRow, ['BerthLength'])),
-        occupancyStatus: this.parseString(this.getFirstValue(normalizedRow, ['OccupancyStatus'])),
-        occupier: this.parseNullableString(this.getFirstValue(normalizedRow, ['Occupier'])),
-        occupierType: this.parseNullableString(this.getFirstValue(normalizedRow, ['OccupierType'])),
-        hasPrivateRenter: this.parseNullableString(this.getFirstValue(normalizedRow, ['HasPrivateRenter'])),
-        rentalLineType: this.parseNullableString(this.getFirstValue(normalizedRow, ['RentalLineType'])),
-        rentalServiceDetailId: this.parseNullableString(this.getFirstValue(normalizedRow, ['RentalServiceDetailID'])),
-        rentalStartDate: this.parseDate(this.getFirstValue(normalizedRow, ['RentalStartDate'])),
-        rentalEndDate: this.parseDate(this.getFirstValue(normalizedRow, ['RentalEndDate'])),
-        rentalAgreementId: this.parseNullableString(this.getFirstValue(normalizedRow, ['RentalAgreementID'])),
+        trustGroup,
+        ownershipType,
+        customerId: this.parseNullableString(ownershipCustomerId),
+        owner,
+        pier: this.parseStringOrNumber(this.getFirstValue(normalizedRow, ['Pier', 'mmbePier'])),
+        berth: this.parseString(this.getFirstValue(normalizedRow, ['Berth', 'mmbeName'])),
+        berthType: this.parseString(this.getFirstValue(normalizedRow, ['BerthType', 'mmbtBerthType'])),
+        berthLength: this.parseNumber(this.getFirstValue(normalizedRow, ['BerthLength', 'mmbeActualLength', 'NominalLength'])),
+        occupancyStatus,
+        occupier,
+        occupierType,
+        hasPrivateRenter: normalizedLineType === 'RESOURCE_PVT' ? 'YES' : 'NO',
+        rentalLineType: rentalLineType || null,
+        rentalServiceDetailId: this.parseNullableString(this.getFirstValue(normalizedRow, ['RentalLineID', 'RentalServiceDetailID', 'sdID', 'RentalServiceDetailId'])),
+        rentalStartDate: this.parseDate(this.getFirstValue(normalizedRow, ['RentalStart', 'RentalStartDate', 'sdStartDate', 'CurrentRentalStartDate', 'DateIn'])),
+        rentalEndDate: this.parseDate(this.getFirstValue(normalizedRow, ['RentalEnd', 'RentalEndDate', 'sdEndDate', 'CurrentRentalEndDate', 'DateOut'])),
+        rentalAgreementId: this.parseNullableString(this.getFirstValue(normalizedRow, ['RentalAgreementID', 'sdTaskHeaderID', 'AgreementID', 'RentalLineID', 'sdID'])),
+        rentalPeriod,
+        reversionPeriod,
+        berthOwner,
+        ownershipCustomer,
       };
     }).filter((record) => record.berth);
   }

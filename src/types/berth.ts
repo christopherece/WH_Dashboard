@@ -68,6 +68,10 @@ export interface ReversionRecord {
   rentalStartDate: Date | null;
   rentalEndDate: Date | null;
   rentalAgreementId: string | null;
+  rentalPeriod?: string | null;
+  reversionPeriod?: string | null;
+  berthOwner?: string | null;
+  ownershipCustomer?: string | null;
 }
 
 export type OccupancyStatus = 'Available' | 'Rented' | 'Booked' | 'Future Booking' | 'Future Rental';

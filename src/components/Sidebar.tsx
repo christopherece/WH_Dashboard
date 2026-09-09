@@ -1,6 +1,6 @@
 import { cn } from '../utils/cn';
 
-type Page = 'dashboard' | 'future' | 'future-bookings' | 'marina-map' | 'customer-heatmap' | 'customer-age' | 'monthly' | 'berths' | 'ownership' | 'reports' | 'quality' | 'compliance' | 'reversion';
+type Page = 'dashboard' | 'future' | 'future-bookings' | 'marina-map' | 'customer-heatmap' | 'customer-age' | 'monthly' | 'berths' | 'ownership' | 'reports' | 'quality' | 'compliance' | 'reversion' | 'sep30';
 
 interface SidebarProps {
   currentPage: Page;
@@ -20,8 +20,9 @@ const navigation = [
   { name: 'Reports', id: 'reports' as Page, icon: '📋' },
   { name: 'Data Quality', id: 'quality' as Page, icon: '✅' },
   { name: 'Reversion Report', id: 'reversion' as Page, icon: 'R' },
+  { name: '30 Sep Snapshot', id: 'sep30' as Page, icon: '📅' },
 ].sort((a, b) => {
-  const order = (page: Page) => page === 'dashboard' ? 0 : page === 'reversion' ? 1 : 2;
+  const order = (page: Page) => page === 'dashboard' ? 0 : page === 'reversion' ? 1 : page === 'sep30' ? 2 : 3;
   return order(a.id) - order(b.id);
 });
 
