@@ -7,6 +7,19 @@ const EXCEL_FILE_NAMES = [
 ];
 const REVERSION_FILE_NAME = 'ReversionMasterQuery.xlsx';
 
+export interface ReversionOwnershipTerm {
+  pier: string | number;
+  berth: string;
+  ownershipType: string;
+  owner: string | null;
+  startDate: Date | null;
+  endDate: Date | null;
+  currentStartDate?: Date | null;
+  currentEndDate?: Date | null;
+  nextStartDate?: Date | null;
+  nextEndDate?: Date | null;
+}
+
 // Use a relative URL so a browser on another device talks to the laptop hosting
 // the dashboard, rather than its own localhost. Vite proxies this in development.
 // A localhost value is only valid for the hosting laptop, so never send it to
@@ -128,6 +141,122 @@ export class ExcelService {
     return this.parseReversionData(rawData);
   }
 
+  async loadReversionTransitionDataFromOccupancy(): Promise<ReversionRecord[]> {
+    const rawData = await this.loadRawOccupancyRows();
+
+    return rawData.map((row) => {
+      const normalizedRow = this.normalizeRowKeys(row);
+      const rawOwnership = this.parseString(this.getFirstValue(normalizedRow, ['OwnershipType', 'mmotDescription', 'mmprName']));
+      const ownerId = this.getFirstValue(normalizedRow, ['OwnerID', 'mmcuID']);
+      const ownershipType = this.resolveOwnershipType(rawOwnership, ownerId);
+
+      const trustGroup = ownershipType.toUpperCase().startsWith('WEMT')
+        ? 'WEMT'
+        : ownershipType.toUpperCase().startsWith('WEXT')
+          ? 'WEXT'
+          : ownershipType.toUpperCase().includes('MARINA')
+            ? 'Marina Trust'
+            : 'Other';
+
+      return {
+        trustGroup,
+        ownershipType,
+        customerId: this.parseNullableString(this.getFirstValue(normalizedRow, ['CustomerID', 'mmcuID'])),
+        owner: this.parseNullableString(this.getFirstValue(normalizedRow, ['Owner', 'CustomerName', 'mmcuLongName'])),
+        pier: this.parseStringOrNumber(this.getFirstValue(normalizedRow, ['Pier', 'mmbePier'])),
+        berth: this.parseString(this.getFirstValue(normalizedRow, ['Berth', 'mmbeName'])),
+        berthType: this.parseString(this.getFirstValue(normalizedRow, ['BerthType', 'mmbtBerthType'])),
+        berthLength: this.parseNumber(this.getFirstValue(normalizedRow, ['BerthLength', 'ActualLength', 'mmbeActualLength', 'NominalLength', 'mmbeNominalLength'])),
+        occupancyStatus: this.parseString(this.getFirstValue(normalizedRow, ['OccupancyStatus', 'ServiceStatus', 'sdStatus'])),
+        occupier: this.parseNullableString(this.getFirstValue(normalizedRow, ['Occupier', 'CustomerName', 'mmcuLongName'])),
+        occupierType: this.parseNullableString(this.getFirstValue(normalizedRow, ['OccupierType', 'ServiceLineType', 'sdLineType'])),
+        hasPrivateRenter: this.parseNullableString(this.getFirstValue(normalizedRow, ['HasPrivateRenter', 'PrivateRenter'])) || 'NO',
+        rentalLineType: this.parseNullableString(this.getFirstValue(normalizedRow, ['RentalLineType', 'sdLineType'])),
+        rentalServiceDetailId: this.parseNullableString(this.getFirstValue(normalizedRow, ['RentalServiceDetailID', 'sdID'])),
+        rentalStartDate: this.parseDate(
+          this.getFirstValue(normalizedRow, [
+            'CurrentRentalStartDate',
+            'CurrentDateIn',
+            'CurrentStartDate',
+            'RentalStartDate',
+            'DateIn',
+            'sdStartDate',
+          ])
+        ),
+        rentalEndDate: this.parseDate(
+          this.getFirstValue(normalizedRow, [
+            'CurrentRentalEndDate',
+            'CurrentDateOut',
+            'CurrentEndDate',
+            'RentalEndDate',
+            'DateOut',
+            'sdEndDate',
+          ])
+        ),
+        rentalAgreementId: this.parseNullableString(this.getFirstValue(normalizedRow, ['RentalAgreementID', 'AgreementID', 'sdID'])),
+      };
+    }).filter((record) => record.berth && record.ownershipType);
+  }
+
+  async loadReversionOwnershipTerms(): Promise<ReversionOwnershipTerm[]> {
+    const rawData = await this.loadRawOccupancyRows();
+
+    return rawData.map((row) => {
+      const normalizedRow = this.normalizeRowKeys(row);
+      const productName = this.parseString(this.getFirstValue(normalizedRow, ['mmprName', 'OwnershipType']));
+      const ownerId = this.getFirstValue(normalizedRow, ['OwnerID', 'mmcuID']);
+      const ownershipType = this.resolveOwnershipType(productName, ownerId);
+
+      return {
+        pier: this.parseStringOrNumber(this.getFirstValue(normalizedRow, ['mmbePier', 'Pier'])),
+        berth: this.parseString(this.getFirstValue(normalizedRow, ['mmbeName', 'Berth'])),
+        ownershipType,
+        owner: this.parseNullableString(this.getFirstValue(normalizedRow, ['mmcuLongName', 'Owner'])),
+        startDate: this.parseDate(this.getFirstValue(normalizedRow, ['CurrentRentalStartDate', 'CurrentDateIn', 'CurrentStartDate', 'sdStartDate', 'RentalStartDate'])),
+        endDate: this.parseDate(this.getFirstValue(normalizedRow, ['CurrentRentalEndDate', 'CurrentDateOut', 'CurrentEndDate', 'sdEndDate', 'RentalEndDate'])),
+        currentStartDate: this.parseDate(this.getFirstValue(normalizedRow, ['CurrentRentalStartDate', 'CurrentDateIn', 'CurrentStartDate', 'sdStartDate', 'RentalStartDate'])),
+        currentEndDate: this.parseDate(this.getFirstValue(normalizedRow, ['CurrentRentalEndDate', 'CurrentDateOut', 'CurrentEndDate', 'sdEndDate', 'RentalEndDate'])),
+        nextStartDate: this.parseDate(this.getFirstValue(normalizedRow, ['NextRentalStartDate', 'FutureRentalStartDate', 'FutureStartDate'])),
+        nextEndDate: this.parseDate(this.getFirstValue(normalizedRow, ['NextRentalEndDate', 'FutureRentalEndDate', 'FutureEndDate'])),
+      };
+    }).filter((record) => record.berth && record.ownershipType);
+  }
+
+  private async loadRawOccupancyRows(): Promise<any[]> {
+    let response: Response | null = null;
+
+    for (const fileName of EXCEL_FILE_NAMES) {
+      try {
+        response = await fetch(`${API_URL}/api/file/${fileName}`);
+        if (response.ok) break;
+      } catch (error) {
+        console.warn(`Failed to fetch ${fileName} from API:`, error);
+      }
+    }
+
+    if (!response?.ok) {
+      for (const fileName of EXCEL_FILE_NAMES) {
+        response = await fetch(`/${fileName}`);
+        if (response.ok) break;
+      }
+    }
+
+    if (!response?.ok) {
+      throw new Error(`Occupancy data is currently unavailable. Ensure one of these files is present: ${EXCEL_FILE_NAMES.join(', ')}`);
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rawData = XLSX.utils.sheet_to_json(worksheet);
+
+    if (!rawData.length) {
+      throw new Error('Occupancy report contains no data.');
+    }
+
+    return rawData;
+  }
+
   private parseData(rawData: any[]): BerthRecord[] {
     const parsedRows = rawData.map((row: any, index: number) => {
       try {
@@ -155,7 +284,10 @@ export class ExcelService {
           marina: this.parseString(this.getFirstValue(normalizedRow, ['Marina', 'MARINA'])),
           berthStatus: this.parseString(this.getFirstValue(normalizedRow, ['BerthStatus', 'Status', 'STATUS'])),
           ownershipTypeId: this.parseNumber(this.getFirstValue(normalizedRow, ['OwnershipTypeID'])),
-          ownershipType: this.parseString(this.getFirstValue(normalizedRow, ['OwnershipType', 'Ownership'])),
+          ownershipType: this.resolveOwnershipType(
+            this.getFirstValue(normalizedRow, ['OwnershipType', 'Ownership']),
+            this.getFirstValue(normalizedRow, ['OwnerID'])
+          ),
           occupancyStatus: this.parseString(this.getFirstValue(normalizedRow, ['OccupancyStatus'])),
           occupiedFlag: this.parseNumber(this.getFirstValue(normalizedRow, ['OccupiedFlag'])),
           availableFlag: this.parseNumber(this.getFirstValue(normalizedRow, ['AvailableFlag'])),
@@ -267,6 +399,9 @@ export class ExcelService {
         occupancyStatus: this.parseString(this.getFirstValue(normalizedRow, ['OccupancyStatus'])),
         occupier: this.parseNullableString(this.getFirstValue(normalizedRow, ['Occupier'])),
         occupierType: this.parseNullableString(this.getFirstValue(normalizedRow, ['OccupierType'])),
+        hasPrivateRenter: this.parseNullableString(this.getFirstValue(normalizedRow, ['HasPrivateRenter'])),
+        rentalLineType: this.parseNullableString(this.getFirstValue(normalizedRow, ['RentalLineType'])),
+        rentalServiceDetailId: this.parseNullableString(this.getFirstValue(normalizedRow, ['RentalServiceDetailID'])),
         rentalStartDate: this.parseDate(this.getFirstValue(normalizedRow, ['RentalStartDate'])),
         rentalEndDate: this.parseDate(this.getFirstValue(normalizedRow, ['RentalEndDate'])),
         rentalAgreementId: this.parseNullableString(this.getFirstValue(normalizedRow, ['RentalAgreementID'])),
@@ -325,6 +460,26 @@ export class ExcelService {
       ewofExpiry: null,
       tntExpiry: null,
     };
+  }
+
+  private resolveOwnershipType(rawOwnership: any, ownerId: any): string {
+    const ownershipValue = this.parseString(rawOwnership);
+    const normalizedOwnership = ownershipValue.toUpperCase();
+    const parsedOwnerId = Number(this.parseString(ownerId));
+
+    if (normalizedOwnership.includes('WEMT')) {
+      return parsedOwnerId === 25008 ? 'WEMT ACC 2026' : 'WEMT 2026';
+    }
+
+    if (normalizedOwnership.includes('WEXT')) {
+      return parsedOwnerId === 25008 ? 'WEXT ACC 2029' : 'WEXT 2029';
+    }
+
+    if (normalizedOwnership.includes('WESTHAVEN NON MARINA')) {
+      return 'Westhaven Non Marina 2026';
+    }
+
+    return ownershipValue;
   }
 
   private normalizeRowKeys(row: any): Record<string, any> {

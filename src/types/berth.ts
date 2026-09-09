@@ -62,6 +62,9 @@ export interface ReversionRecord {
   occupancyStatus: string;
   occupier: string | null;
   occupierType: string | null;
+  hasPrivateRenter: string | null;
+  rentalLineType: string | null;
+  rentalServiceDetailId: string | null;
   rentalStartDate: Date | null;
   rentalEndDate: Date | null;
   rentalAgreementId: string | null;
