@@ -20,9 +20,8 @@ const navigation = [
   { name: 'Reports', id: 'reports' as Page, icon: '📋' },
   { name: 'Data Quality', id: 'quality' as Page, icon: '✅' },
   { name: 'Reversion Report', id: 'reversion' as Page, icon: 'R' },
-  { name: '30 Sep Snapshot', id: 'sep30' as Page, icon: '📅' },
 ].sort((a, b) => {
-  const order = (page: Page) => page === 'dashboard' ? 0 : page === 'reversion' ? 1 : page === 'sep30' ? 2 : 3;
+  const order = (page: Page) => page === 'dashboard' ? 0 : page === 'reversion' ? 1 : 3;
   return order(a.id) - order(b.id);
 });
 

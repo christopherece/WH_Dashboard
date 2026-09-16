@@ -41,6 +41,7 @@ const isVacantLike = (status: string) => {
 
 const DEFAULT_REVERSION_TITLE = 'Reversion Master Query Report';
 const DEFAULT_REVERSION_SUBTITLE = 'Source: ReversionMasterQuery.xlsx';
+const AUCKLAND_COUNCIL_CUSTOMER_ID = '25008';
 
 export default function ReversionReport({
   onRefresh,
@@ -58,6 +59,8 @@ export default function ReversionReport({
   const [lengthFilter, setLengthFilter] = useState<number[]>([]);
   const [showLengthOptions, setShowLengthOptions] = useState(false);
   const [occupancyFilter, setOccupancyFilter] = useState('all');
+  const [rentalTimingFilter, setRentalTimingFilter] = useState('all');
+  const [customerOwnershipFilter, setCustomerOwnershipFilter] = useState('all');
   const [includeBookedInOccupancy, setIncludeBookedInOccupancy] = useState(false);
   const [pendingByLength, setPendingByLength] = useState<Record<number, number>>({});
   const [searchText, setSearchText] = useState('');
@@ -96,9 +99,19 @@ export default function ReversionReport({
     [data]
   );
   const occupancyStatuses = useMemo(() => ['Occupied', 'Vacant', 'Booked'], []);
+  const rentalTimings = useMemo(
+    () => [...new Set(data.map((item) => item.rentalTiming).filter(Boolean) as string[])].sort(),
+    [data]
+  );
   const allOwnershipSelected = ownershipTypes.length > 0 && ownershipTypes.every((value) => ownershipFilter.includes(value));
   const allBerthTypesSelected = berthTypes.length > 0 && berthTypes.every((value) => berthTypeFilter.includes(value));
   const allLengthsSelected = berthLengths.length > 0 && berthLengths.every((value) => lengthFilter.includes(value));
+
+  const getCustomerOwnershipCategory = (customerId: string | null) => {
+    return String(customerId || '').trim() === AUCKLAND_COUNCIL_CUSTOMER_ID
+      ? 'aucklandCouncilOwned'
+      : 'private';
+  };
 
   const baseFilteredData = useMemo(
     () =>
@@ -113,6 +126,7 @@ export default function ReversionReport({
           item.occupancyStatus,
           item.occupier || '',
           item.occupierType || '',
+          item.rentalTiming || '',
         ]
           .join(' ')
           .toLowerCase();
@@ -121,10 +135,12 @@ export default function ReversionReport({
           (!ownershipFilter.length || ownershipFilter.includes(item.ownershipType)) &&
           (!berthTypeFilter.length || berthTypeFilter.includes(item.berthType)) &&
           (!lengthFilter.length || lengthFilter.includes(Math.round(item.berthLength))) &&
+          (rentalTimingFilter === 'all' || item.rentalTiming === rentalTimingFilter) &&
+          (customerOwnershipFilter === 'all' || getCustomerOwnershipCategory(item.customerId) === customerOwnershipFilter) &&
           (!searchText.trim() || searchTarget.includes(searchText.toLowerCase().trim()))
         );
       }),
-    [data, ownershipFilter, berthTypeFilter, lengthFilter, searchText]
+    [data, ownershipFilter, berthTypeFilter, lengthFilter, rentalTimingFilter, customerOwnershipFilter, searchText]
   );
 
   const displayData = useMemo(
@@ -170,26 +186,19 @@ export default function ReversionReport({
 
   const summary = useMemo(() => {
     const berthKey = (item: ReversionRecord) => `${item.pier ?? ''}-${item.berth ?? ''}`;
-    const startCutoff = new Date(2026, 8, 30);
 
     const occupiedKeys = new Set(
       displayData
-        .filter((item) => {
-          const hasActiveStartDate = item.rentalStartDate instanceof Date && !Number.isNaN(item.rentalStartDate.getTime())
-            ? item.rentalStartDate >= startCutoff
-            : false;
-
-          return hasActiveStartDate && (
-            isStrictOccupied(item.occupancyStatus) ||
-            (includeBookedInOccupancy && isBooked(item.occupancyStatus))
-          );
-        })
+        .filter((item) =>
+          isStrictOccupied(item.occupancyStatus) ||
+          (includeBookedInOccupancy && isBooked(item.occupancyStatus))
+        )
         .map(berthKey)
     );
 
     const bookedKeys = new Set(
       displayData
-        .filter((item) => item.occupancyStatus.toLowerCase() === 'booked' && item.rentalStartDate && item.rentalStartDate >= startCutoff)
+        .filter((item) => item.occupancyStatus.toLowerCase() === 'booked')
         .map(berthKey)
     );
 
@@ -282,7 +291,12 @@ export default function ReversionReport({
     const isDate = (date: Date | null, year: number, month: number, day: number) =>
       Boolean(date && date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day);
 
-    const wemtRecords = data.filter((item) => ENDING_OWNERSHIP_TYPES.has(item.ownershipType));
+    const isFutureRentalTiming = (timing: string | null) =>
+      String(timing || '').toLowerCase().includes('future rental');
+
+    const wemtRecords = data.filter(
+      (item) => ENDING_OWNERSHIP_TYPES.has(item.ownershipType) && isFutureRentalTiming(item.rentalTiming)
+    );
     const occupiedRecords = wemtRecords.filter((item) => item.occupancyStatus.toLowerCase() === 'occupied');
     const reversionStartDate = new Date(2026, 8, 30);
 
@@ -326,6 +340,7 @@ export default function ReversionReport({
         'Occupancy Status': item.occupancyStatus,
         Occupier: item.occupier || '',
         'Occupier Type': item.occupierType || '',
+        'Rental Timing': item.rentalTiming || '',
         'Rental Start Date': formatDate(item.rentalStartDate),
         'Rental End Date': formatDate(item.rentalEndDate),
         'Rental Agreement ID': item.rentalAgreementId || '',
@@ -369,10 +384,6 @@ export default function ReversionReport({
           <button onClick={handleExport} disabled={!displayData.length} className="btn btn-primary">Export Report</button>
           <button onClick={() => { onRefresh(); loadData(); }} className="btn btn-secondary">Refresh Data</button>
         </div>
-      </div>
-
-      <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-        Snapshot note: this report is intended to show the position at 30 Sep 2026 and assumes no active Future Rental or Future Booking lines are included.
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
@@ -430,7 +441,7 @@ export default function ReversionReport({
         <div className="card-header">
           <h2 className="card-title">Filter Options</h2>
         </div>
-        <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-6">
+        <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-8">
           <div className="relative">
             <button
               type="button"
@@ -597,6 +608,23 @@ export default function ReversionReport({
             ))}
           </select>
 
+          <select value={rentalTimingFilter} onChange={(event) => setRentalTimingFilter(event.target.value)} className="select">
+            <option value="all">All rental timings</option>
+            {rentalTimings.map((timing) => (
+              <option key={timing} value={timing}>{timing}</option>
+            ))}
+          </select>
+
+          <select
+            value={customerOwnershipFilter}
+            onChange={(event) => setCustomerOwnershipFilter(event.target.value)}
+            className="select"
+          >
+            <option value="all">All customer ownership</option>
+            <option value="aucklandCouncilOwned">Auckland Council Owned (Customer ID 25008)</option>
+            <option value="private">Private</option>
+          </select>
+
           <input
             type="text"
             value={searchText}
@@ -612,6 +640,8 @@ export default function ReversionReport({
               setBerthTypeFilter([]);
               setLengthFilter([]);
               setOccupancyFilter('all');
+              setRentalTimingFilter('all');
+              setCustomerOwnershipFilter('all');
               setIncludeBookedInOccupancy(false);
               setPendingByLength({});
               setSearchText('');

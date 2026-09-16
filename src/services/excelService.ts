@@ -206,6 +206,7 @@ export class ExcelService {
         occupierType: this.parseNullableString(this.getFirstValue(normalizedRow, ['OccupierType', 'ServiceLineType', 'sdLineType'])),
         hasPrivateRenter: this.parseNullableString(this.getFirstValue(normalizedRow, ['HasPrivateRenter', 'PrivateRenter'])) || 'NO',
         rentalLineType: this.parseNullableString(this.getFirstValue(normalizedRow, ['RentalLineType', 'sdLineType'])),
+        rentalTiming: this.parseNullableString(this.getFirstValue(normalizedRow, ['RentalTiming', 'Rental Timing', 'Timing'])),
         rentalServiceDetailId: this.parseNullableString(this.getFirstValue(normalizedRow, ['RentalServiceDetailID', 'sdID'])),
         rentalStartDate: this.parseDate(
           this.getFirstValue(normalizedRow, [
@@ -436,6 +437,8 @@ export class ExcelService {
 
       const rentalStatus = this.parseString(this.getFirstValue(normalizedRow, ['RentalStatus', 'sdStatus', 'OccupancyStatus', 'Status']));
       const rentalLineType = this.parseString(this.getFirstValue(normalizedRow, ['RentalLineType', 'SDLineType', 'sdLineType', 'ServiceLineType', 'ResourceLineType']));
+      const rentalTiming = this.parseNullableString(this.getFirstValue(normalizedRow, ['RentalTiming', 'Rental Timing', 'Timing']));
+      const normalizedRentalStatus = rentalStatus.toUpperCase();
       const normalizedLineType = rentalLineType.toUpperCase();
       const occupierType = (() => {
         switch (normalizedLineType) {
@@ -454,9 +457,17 @@ export class ExcelService {
 
       const occupancyStatus = !rentalStatus
         ? 'Vacant'
-        : rentalStatus.toUpperCase() === 'BOOKED'
+        : normalizedRentalStatus === 'BOOKED'
           ? 'Booked'
-          : 'Occupied';
+          : normalizedRentalStatus === 'OCCUPIED' || normalizedRentalStatus === 'RENTED'
+            ? 'Occupied'
+            : normalizedRentalStatus.includes('NO CURRENT RENTAL FOUND') ||
+                normalizedRentalStatus.includes('NO FUTURE RENTAL FOUND') ||
+                normalizedRentalStatus.includes('NO RENTAL FOUND') ||
+                normalizedRentalStatus.includes('VACANT') ||
+                normalizedRentalStatus.includes('AVAILABLE')
+              ? 'Vacant'
+              : 'Occupied';
 
       const berthOwner = this.parseNullableString(this.getFirstValue(normalizedRow, ['BerthOwner', 'Owner', 'OwnerName', 'CustomerName']));
       const ownershipCustomer = this.parseNullableString(this.getFirstValue(normalizedRow, ['OwnershipCustomer', 'Owner', 'CustomerName', 'mmcuLongName']));
@@ -479,6 +490,7 @@ export class ExcelService {
         occupierType,
         hasPrivateRenter: normalizedLineType === 'RESOURCE_PVT' ? 'YES' : 'NO',
         rentalLineType: rentalLineType || null,
+        rentalTiming,
         rentalServiceDetailId: this.parseNullableString(this.getFirstValue(normalizedRow, ['RentalLineID', 'RentalServiceDetailID', 'sdID', 'RentalServiceDetailId'])),
         rentalStartDate: this.parseDate(this.getFirstValue(normalizedRow, ['RentalStart', 'RentalStartDate', 'sdStartDate', 'CurrentRentalStartDate', 'DateIn'])),
         rentalEndDate: this.parseDate(this.getFirstValue(normalizedRow, ['RentalEnd', 'RentalEndDate', 'sdEndDate', 'CurrentRentalEndDate', 'DateOut'])),
