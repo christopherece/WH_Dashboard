@@ -60,6 +60,7 @@ export interface ReversionRecord {
   berthType: string;
   berthLength: number;
   occupancyStatus: string;
+  rawOccupancyStatus: string | null;
   occupier: string | null;
   occupierType: string | null;
   hasPrivateRenter: string | null;

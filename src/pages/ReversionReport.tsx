@@ -39,6 +39,15 @@ const isVacantLike = (status: string) => {
   return normalized === 'vacant' || normalized === 'available';
 };
 
+const isCurrentRentalTiming = (timing: string | null) =>
+  String(timing || '').toLowerCase().includes('current rental');
+
+const isFutureRentalTiming = (timing: string | null) =>
+  String(timing || '').toLowerCase().includes('future rental');
+
+const isNoCurrentRentalFound = (rawStatus: string | null) =>
+  String(rawStatus || '').toUpperCase().includes('NO CURRENT RENTAL FOUND');
+
 const DEFAULT_REVERSION_TITLE = 'Reversion Master Query Report';
 const DEFAULT_REVERSION_SUBTITLE = 'Source: ReversionMasterQuery.xlsx';
 const AUCKLAND_COUNCIL_CUSTOMER_ID = '25008';
@@ -187,23 +196,41 @@ export default function ReversionReport({
   const summary = useMemo(() => {
     const berthKey = (item: ReversionRecord) => `${item.pier ?? ''}-${item.berth ?? ''}`;
 
+    const futureStatusByBerth = new Map<string, string>();
+    data
+      .filter((item) => isFutureRentalTiming(item.rentalTiming))
+      .forEach((item) => {
+        const key = berthKey(item);
+        const current = futureStatusByBerth.get(key);
+        if (!current || (current !== 'Occupied' && item.occupancyStatus === 'Occupied')) {
+          futureStatusByBerth.set(key, item.occupancyStatus);
+        }
+      });
+
+    const effectiveStatus = (item: ReversionRecord) => {
+      if (isCurrentRentalTiming(item.rentalTiming) && isNoCurrentRentalFound(item.rawOccupancyStatus)) {
+        return futureStatusByBerth.get(berthKey(item)) || item.occupancyStatus;
+      }
+      return item.occupancyStatus;
+    };
+
     const occupiedKeys = new Set(
       displayData
         .filter((item) =>
-          isStrictOccupied(item.occupancyStatus) ||
-          (includeBookedInOccupancy && isBooked(item.occupancyStatus))
+          isStrictOccupied(effectiveStatus(item)) ||
+          (includeBookedInOccupancy && isBooked(effectiveStatus(item)))
         )
         .map(berthKey)
     );
 
     const bookedKeys = new Set(
       displayData
-        .filter((item) => item.occupancyStatus.toLowerCase() === 'booked')
+        .filter((item) => effectiveStatus(item).toLowerCase() === 'booked')
         .map(berthKey)
     );
 
     const vacantKeys = new Set(
-      displayData.filter((item) => isVacantLike(item.occupancyStatus)).map(berthKey)
+      displayData.filter((item) => isVacantLike(effectiveStatus(item))).map(berthKey)
     );
 
     return {
@@ -212,7 +239,7 @@ export default function ReversionReport({
       booked: bookedKeys.size,
       vacant: vacantKeys.size,
     };
-  }, [displayData, includeBookedInOccupancy]);
+  }, [data, displayData, includeBookedInOccupancy]);
 
   const overallOccupancyPercent = useMemo(
     () => {
