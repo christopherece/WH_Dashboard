@@ -14,11 +14,13 @@ export default function TimeBasedOccupancy({ onRefresh }: TimeBasedOccupancyProp
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [selectedMarina, setSelectedMarina] = useState<string>('');
-  const [selectedYear, setSelectedYear] = useState<number | null>(null);
+  const [selectedYears, setSelectedYears] = useState<number[]>([]);
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [selectedBerthTypes, setSelectedBerthTypes] = useState<string[]>([]);
   const [showBerthTypeOptions, setShowBerthTypeOptions] = useState(false);
+  const [showYearOptions, setShowYearOptions] = useState(false);
   const berthTypeDropdownRef = useRef<HTMLDivElement>(null);
+  const yearDropdownRef = useRef<HTMLDivElement>(null);
 
   const loadData = async () => {
     try {
@@ -45,6 +47,9 @@ export default function TimeBasedOccupancy({ onRefresh }: TimeBasedOccupancyProp
       if (berthTypeDropdownRef.current && !berthTypeDropdownRef.current.contains(event.target as Node)) {
         setShowBerthTypeOptions(false);
       }
+      if (yearDropdownRef.current && !yearDropdownRef.current.contains(event.target as Node)) {
+        setShowYearOptions(false);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
@@ -58,8 +63,8 @@ export default function TimeBasedOccupancy({ onRefresh }: TimeBasedOccupancyProp
     if (selectedMarina) {
       result = result.filter(r => r.marina === selectedMarina);
     }
-    if (selectedYear) {
-      result = result.filter(r => r.year === selectedYear);
+    if (selectedYears && selectedYears.length > 0) {
+      result = result.filter(r => selectedYears.includes(r.year));
     }
     if (selectedMonth) {
       result = result.filter(r => r.month === selectedMonth);
@@ -69,7 +74,7 @@ export default function TimeBasedOccupancy({ onRefresh }: TimeBasedOccupancyProp
     }
 
     return result;
-  }, [data, selectedMarina, selectedYear, selectedMonth, selectedBerthTypes]);
+  }, [data, selectedMarina, selectedYears, selectedMonth, selectedBerthTypes]);
 
   // Get unique values for filters
   const uniqueMarinas = useMemo(() => {
@@ -99,11 +104,10 @@ export default function TimeBasedOccupancy({ onRefresh }: TimeBasedOccupancyProp
         fleetWideOccupancy: 0,
         totalBerths: 0,
         categories: 0,
-        currentMonthYear: 'No data',
       };
     }
 
-    // Find the most recent month in the filtered data
+    // Find the most recent time period for current snapshot metrics
     const sortedData = [...filteredData].sort((a, b) => {
       if (a.year !== b.year) return b.year - a.year;
       return b.month - a.month;
@@ -114,38 +118,55 @@ export default function TimeBasedOccupancy({ onRefresh }: TimeBasedOccupancyProp
         fleetWideOccupancy: 0,
         totalBerths: 0,
         categories: 0,
-        currentMonthYear: '',
       };
     }
 
     const mostRecentYear = sortedData[0].year;
     const mostRecentMonth = sortedData[0].month;
 
-    // Filter to only the most recent month
-    const currentMonthData = filteredData.filter(
+    // Filter to only the most recent period for current snapshot metrics
+    const currentSnapshot = filteredData.filter(
       record => record.year === mostRecentYear && record.month === mostRecentMonth
     );
 
-    // Calculate current month occupancy: total occupied days / total available berth-days
-    const totalOccupiedDays = currentMonthData.reduce((sum, r) => sum + r.occupiedDays, 0);
-    const totalAvailableDays = currentMonthData.reduce((sum, r) => sum + r.daysInMonth, 0);
-    const fleetWideOccupancy = totalAvailableDays > 0 ? (totalOccupiedDays / totalAvailableDays) * 100 : 0;
+    // Calculate fleet-wide occupancy as simple average of berth type occupancy percentages for current snapshot
+    const berthTypeOccupancy = new Map<string, { totalOccupancy: number; count: number }>();
 
-    // Get unique berths count (from current month)
-    const uniqueBerths = new Set(currentMonthData.map(r => r.berth)).size;
+    currentSnapshot.forEach(record => {
+      const berthType = record.berthType || 'Unknown';
+      const existing = berthTypeOccupancy.get(berthType);
 
-    // Count unique berth types as categories
-    const categories = new Set(filteredData.map(r => r.berthType)).size;
+      if (existing) {
+        existing.totalOccupancy += record.occupancyPercent;
+        existing.count += 1;
+      } else {
+        berthTypeOccupancy.set(berthType, {
+          totalOccupancy: record.occupancyPercent,
+          count: 1,
+        });
+      }
+    });
 
-    // Format current month/year
-    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-    const currentMonthYear = `${monthNames[mostRecentMonth - 1]} ${mostRecentYear}`;
+    // Calculate average occupancy for each berth type
+    const berthTypeAverages = Array.from(berthTypeOccupancy.values()).map(
+      data => data.totalOccupancy / data.count
+    );
+
+    // Fleet-wide occupancy is the simple average of berth type averages for current snapshot
+    const fleetWideOccupancy = berthTypeAverages.length > 0
+      ? berthTypeAverages.reduce((sum, avg) => sum + avg, 0) / berthTypeAverages.length
+      : 0;
+
+    // Get unique berths count from current snapshot
+    const uniqueBerths = new Set(currentSnapshot.map(r => r.berth)).size;
+
+    // Count unique berth types as categories from current snapshot
+    const categories = new Set(currentSnapshot.map(r => r.berthType)).size;
 
     return {
       fleetWideOccupancy: Math.round(fleetWideOccupancy * 10) / 10,
       totalBerths: uniqueBerths,
       categories,
-      currentMonthYear,
     };
   }, [filteredData]);
 
@@ -350,7 +371,7 @@ export default function TimeBasedOccupancy({ onRefresh }: TimeBasedOccupancyProp
 
   const handleClearFilters = () => {
     setSelectedMarina('');
-    setSelectedYear(null);
+    setSelectedYears([]);
     setSelectedMonth(null);
     setSelectedBerthTypes([]);
   };
@@ -439,18 +460,42 @@ export default function TimeBasedOccupancy({ onRefresh }: TimeBasedOccupancyProp
               ))}
             </select>
           </div>
-          <div>
+          <div className="relative" ref={yearDropdownRef}>
             <label className="block text-sm font-medium text-gray-700 mb-1">Year</label>
-            <select
-              value={selectedYear || ''}
-              onChange={(e) => setSelectedYear(e.target.value ? Number(e.target.value) : null)}
-              className="select"
+            <button
+              type="button"
+              onClick={() => setShowYearOptions((show) => !show)}
+              className="select flex w-full items-center justify-between text-left"
             >
-              <option value="">All Years</option>
-              {uniqueYears.map((year) => (
-                <option key={year} value={year}>{year}</option>
-              ))}
-            </select>
+              <span className="truncate">
+                {selectedYears && selectedYears.length > 0
+                  ? `${selectedYears.length} year${selectedYears.length === 1 ? '' : 's'} selected`
+                  : 'All Years'}
+              </span>
+              <span className="ml-2">v</span>
+            </button>
+
+            {showYearOptions && (
+              <div className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-gray-300 bg-white p-2 shadow-lg">
+                {uniqueYears.map((year) => (
+                  <label key={year} className="flex items-center space-x-2 px-2 py-1 hover:bg-gray-100 rounded cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedYears.includes(year)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedYears([...selectedYears, year]);
+                        } else {
+                          setSelectedYears(selectedYears.filter(y => y !== year));
+                        }
+                      }}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-sm">{year}</span>
+                  </label>
+                ))}
+              </div>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Month</label>
@@ -511,7 +556,7 @@ export default function TimeBasedOccupancy({ onRefresh }: TimeBasedOccupancyProp
           <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-navy-700 to-navy-800" />
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-sm font-medium text-slate-500">Fleet-wide occupancy {aggregateMetrics.currentMonthYear}</p>
+              <p className="text-sm font-medium text-slate-500">Fleet-wide occupancy</p>
               <p className="mt-3 text-3xl font-bold tracking-tight text-slate-900">{aggregateMetrics.fleetWideOccupancy}%</p>
             </div>
             <div className="flex h-11 w-11 items-center justify-center rounded-xl text-lg font-semibold bg-navy-100 text-navy-700">
