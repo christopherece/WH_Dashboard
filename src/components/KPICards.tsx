@@ -35,7 +35,7 @@ export default function KPICards({ metrics }: KPICardsProps) {
       iconClass: 'bg-emerald-100 text-emerald-700',
     },
     {
-      title: 'Occupancy %',
+      title: 'Snapshot Occupancy %',
       value: `${metrics.occupancyPercentage}%`,
       icon: '▣',
       accent: 'from-sky-500 to-blue-600',

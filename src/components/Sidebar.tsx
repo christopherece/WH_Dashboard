@@ -1,6 +1,6 @@
 import { cn } from '../utils/cn';
 
-type Page = 'dashboard' | 'future' | 'future-bookings' | 'marina-map' | 'customer-heatmap' | 'customer-age' | 'monthly' | 'berths' | 'ownership' | 'reports' | 'quality' | 'compliance' | 'reversion' | 'sep30';
+type Page = 'dashboard' | 'future' | 'future-bookings' | 'marina-map' | 'customer-heatmap' | 'customer-age' | 'monthly' | 'berths' | 'ownership' | 'reports' | 'quality' | 'compliance' | 'reversion' | 'sep30' | 'time-based-occupancy';
 
 interface SidebarProps {
   currentPage: Page;
@@ -9,6 +9,7 @@ interface SidebarProps {
 
 const navigation = [
   { name: 'Dashboard', id: 'dashboard' as Page, icon: '📊' },
+  { name: 'Time-Based Occupancy', id: 'time-based-occupancy' as Page, icon: '⏱️' },
   { name: 'Future Bookings', id: 'future-bookings' as Page, icon: '📌' },
   { name: 'Marina Map', id: 'marina-map' as Page, icon: '🗺️' },
   { name: 'Customer Heat Map', id: 'customer-heatmap' as Page, icon: '🔥' },
@@ -21,7 +22,12 @@ const navigation = [
   { name: 'Data Quality', id: 'quality' as Page, icon: '✅' },
   { name: 'Reversion Report', id: 'reversion' as Page, icon: 'R' },
 ].sort((a, b) => {
-  const order = (page: Page) => page === 'dashboard' ? 0 : page === 'reversion' ? 1 : 3;
+  const order = (page: Page) => {
+    if (page === 'dashboard') return 0;
+    if (page === 'time-based-occupancy') return 1;
+    if (page === 'reversion') return 2;
+    return 3;
+  };
   return order(a.id) - order(b.id);
 });
 

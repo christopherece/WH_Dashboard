@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import { BerthRecord, DataQualityReport, ReversionRecord } from '../types/berth';
+import { BerthRecord, DataQualityReport, ReversionRecord, TimeBasedOccupancyRecord } from '../types/berth';
 
 const EXCEL_FILE_NAMES = [
   'OccupancyReport.xlsx',
@@ -7,6 +7,7 @@ const EXCEL_FILE_NAMES = [
 ];
 const REVERSION_FILE_NAME = 'ReversionMasterQuery.xlsx';
 const SEP30_REPORT_FILE_NAME = 'Sep30Report.xlsx';
+const TIME_BASED_OCCUPANCY_FILE_NAME = 'TimeBasedOccupancy.xlsx';
 
 export interface ReversionOwnershipTerm {
   pier: string | number;
@@ -34,6 +35,8 @@ const API_URL = configuredApiUrl && !isLocalOnlyUrl ? configuredApiUrl.replace(/
 export class ExcelService {
   private cachedData: BerthRecord[] | null = null;
   private lastLoaded: Date | null = null;
+  private cachedTimeBasedData: TimeBasedOccupancyRecord[] | null = null;
+  private lastTimeBasedLoaded: Date | null = null;
 
   async loadData(): Promise<{ data: BerthRecord[]; dataQuality: DataQualityReport }> {
     try {
@@ -173,6 +176,92 @@ export class ExcelService {
 
   async loadReversionNewData(): Promise<ReversionRecord[]> {
     return this.loadSep30ReportData();
+  }
+
+  async loadTimeBasedOccupancyData(): Promise<TimeBasedOccupancyRecord[]> {
+    // Return cached data if available and recent
+    if (this.cachedTimeBasedData && this.lastTimeBasedLoaded) {
+      const cacheAge = Date.now() - this.lastTimeBasedLoaded.getTime();
+      if (cacheAge < 5 * 60 * 1000) { // 5 minutes cache
+        console.log('Returning cached time-based occupancy data');
+        return this.cachedTimeBasedData;
+      }
+    }
+
+    console.log('Attempting to load TimeBasedOccupancy.xlsx from:', TIME_BASED_OCCUPANCY_FILE_NAME);
+    let response: Response | null = null;
+
+    try {
+      response = await fetch(`${API_URL}/api/file/${TIME_BASED_OCCUPANCY_FILE_NAME}`);
+      console.log('API response status:', response?.status);
+    } catch (error) {
+      console.warn('Failed to fetch Time Based Occupancy from API:', error);
+    }
+
+    if (!response?.ok) {
+      console.log('API failed, trying public folder');
+      response = await fetch(`/${TIME_BASED_OCCUPANCY_FILE_NAME}`);
+      console.log('Public folder response status:', response?.status);
+    }
+
+    if (!response.ok) {
+      throw new Error(`Time Based Occupancy data is currently unavailable. File not found: ${TIME_BASED_OCCUPANCY_FILE_NAME}. Please ensure it exists in the data directory.`);
+    }
+
+    console.log('File found, reading array buffer...');
+    const arrayBuffer = await response.arrayBuffer();
+    console.log('Array buffer size:', arrayBuffer.byteLength, 'bytes');
+
+    if (arrayBuffer.byteLength === 0) {
+      throw new Error('Excel file is empty');
+    }
+
+    console.log('Parsing Excel file...');
+    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+    console.log('Workbook sheets:', workbook.SheetNames);
+
+    if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+      throw new Error('Excel file contains no sheets');
+    }
+
+    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rawData = XLSX.utils.sheet_to_json(worksheet);
+    console.log('Raw data rows:', rawData.length);
+
+    if (!rawData.length) {
+      throw new Error('Time Based Occupancy contains no data rows.');
+    }
+
+    console.log('Parsing time-based occupancy data...');
+    const data = this.parseTimeBasedOccupancyData(rawData);
+    console.log('Parsed data records:', data.length);
+
+    this.cachedTimeBasedData = data;
+    this.lastTimeBasedLoaded = new Date();
+
+    return data;
+  }
+
+  private parseTimeBasedOccupancyData(rawData: any[]): TimeBasedOccupancyRecord[] {
+    return rawData.map((row: any, index: number) => {
+      try {
+        const normalizedRow = this.normalizeRowKeys(row);
+
+        return {
+          marina: this.parseString(this.getFirstValue(normalizedRow, ['Marina', 'MARINA'])),
+          berth: this.parseString(this.getFirstValue(normalizedRow, ['Berth', 'BerthNumber', 'BerthNo'])),
+          berthType: this.parseString(this.getFirstValue(normalizedRow, ['BerthType', 'Type', 'Berth Type'])),
+          year: this.parseNumber(this.getFirstValue(normalizedRow, ['Year', 'YEAR'])),
+          month: this.parseNumber(this.getFirstValue(normalizedRow, ['Month', 'MONTH'])),
+          occupiedDays: this.parseNumber(this.getFirstValue(normalizedRow, ['OccupiedDays', 'Occupied Days', 'Occupied_Days'])),
+          daysInMonth: this.parseNumber(this.getFirstValue(normalizedRow, ['DaysInMonth', 'Days In Month', 'Days_In_Month'])),
+          occupancyPercent: this.parseNumber(this.getFirstValue(normalizedRow, ['OccupancyPercent', 'Occupancy Percent', 'Occupancy_Percent'])),
+        };
+      } catch (error) {
+        console.error(`Error parsing time-based occupancy row ${index}:`, error);
+        return null;
+      }
+    }).filter((record): record is TimeBasedOccupancyRecord => record !== null);
   }
 
   async loadReversionTransitionDataFromOccupancy(): Promise<ReversionRecord[]> {
@@ -751,9 +840,15 @@ export class ExcelService {
     return this.lastLoaded;
   }
 
+  getLastTimeBasedLoaded(): Date | null {
+    return this.lastTimeBasedLoaded;
+  }
+
   clearCache(): void {
     this.cachedData = null;
     this.lastLoaded = null;
+    this.cachedTimeBasedData = null;
+    this.lastTimeBasedLoaded = null;
   }
 }
 

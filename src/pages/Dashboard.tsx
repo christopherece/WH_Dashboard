@@ -115,7 +115,7 @@ export default function Dashboard({ allData, filters, onFilterChange, lastUpdate
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-              <p className="px-1 pt-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">Occupancy Gauge</p>
+              <p className="px-1 pt-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">Snapshot Occupancy Gauge</p>
               <div className="mt-1">
                 <OccupancyGauge occupancy={kpiMetrics.occupancyPercentage} />
               </div>

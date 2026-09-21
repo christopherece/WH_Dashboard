@@ -190,3 +190,14 @@ export interface VesselCompliance {
   berthLength: number;
   berthWidth: number;
 }
+
+export interface TimeBasedOccupancyRecord {
+  marina: string;
+  berth: string;
+  berthType: string;
+  year: number;
+  month: number;
+  occupiedDays: number;
+  daysInMonth: number;
+  occupancyPercent: number;
+}

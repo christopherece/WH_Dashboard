@@ -1,9 +1,10 @@
 import { useState, useMemo } from 'react';
 import { BerthRecord, FilterState } from '../types/berth';
-import { exportToCSV, getUniqueValues } from '../utils/dataUtils';
+import { exportToCSV, getUniqueValues, calculateKPIMetrics } from '../utils/dataUtils';
 import BerthTable from '../components/BerthTable';
 import BerthDetailPanel from '../components/BerthDetailPanel';
 import FilterPanel from '../components/FilterPanel';
+import KPICards from '../components/KPICards';
 
 interface BerthsProps {
   data: BerthRecord[];
@@ -60,6 +61,8 @@ export default function Berths({ data, lastUpdated, onRefresh }: BerthsProps) {
     ownershipTypes: getUniqueValues<string>(data, 'ownershipType'),
     berthSizes: getUniqueValues<number>(data, 'nominalLength'),
   }), [data]);
+
+  const kpiMetrics = useMemo(() => calculateKPIMetrics(filteredData), [filteredData]);
 
   const handleFilterChange = (newFilters: FilterState) => {
     setFilters(newFilters);
@@ -130,6 +133,9 @@ export default function Berths({ data, lastUpdated, onRefresh }: BerthsProps) {
         onClearFilters={handleClearFilters}
         uniqueValues={uniqueValues}
       />
+
+      {/* KPI Cards */}
+      <KPICards metrics={kpiMetrics} />
 
       <div className="card">
         <div className="card-header">

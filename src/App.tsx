@@ -19,8 +19,9 @@ import CustomerHeatMap from './pages/CustomerHeatMap';
 import CustomerAgeReport from './pages/CustomerAgeReport';
 import ReversionReport from './pages/ReversionReport';
 import Sep30Report from './pages/Sep30Report';
+import TimeBasedOccupancy from './pages/TimeBasedOccupancy';
 
-type Page = 'dashboard' | 'future' | 'future-bookings' | 'marina-map' | 'customer-heatmap' | 'customer-age' | 'monthly' | 'berths' | 'ownership' | 'reports' | 'quality' | 'compliance' | 'reversion' | 'sep30';
+type Page = 'dashboard' | 'future' | 'future-bookings' | 'marina-map' | 'customer-heatmap' | 'customer-age' | 'monthly' | 'berths' | 'ownership' | 'reports' | 'quality' | 'compliance' | 'reversion' | 'sep30' | 'time-based-occupancy';
 
 function App() {
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
@@ -113,6 +114,8 @@ function App() {
         return <ReversionReport onRefresh={handleRefresh} />;
       case 'sep30':
         return <Sep30Report onRefresh={handleRefresh} />;
+      case 'time-based-occupancy':
+        return <TimeBasedOccupancy onRefresh={handleRefresh} />;
       default:
         return <Dashboard {...commonProps} />;
     }
