@@ -129,18 +129,19 @@ export default function TimeBasedOccupancy({ onRefresh }: TimeBasedOccupancyProp
       record => record.year === mostRecentYear && record.month === mostRecentMonth
     );
 
-    // Calculate fleet-wide occupancy as simple average of all individual berth occupancy percentages
-    let totalOccupancySum = 0;
-    let recordCount = 0;
+    // Calculate fleet-wide occupancy using berth-days weighting (capacity-weighted)
+    // Overall Occupancy = (Total OccupiedDays / Total DaysInMonth) × 100
+    let totalOccupiedDays = 0;
+    let totalDaysInMonth = 0;
 
     currentSnapshot.forEach(record => {
-      totalOccupancySum += record.occupancyPercent;
-      recordCount += 1;
+      totalOccupiedDays += record.occupiedDays;
+      totalDaysInMonth += record.daysInMonth;
     });
 
-    // Fleet-wide occupancy is the simple average of all individual berth records
-    const fleetWideOccupancy = recordCount > 0
-      ? totalOccupancySum / recordCount
+    // Fleet-wide occupancy using berth-days weighting
+    const fleetWideOccupancy = totalDaysInMonth > 0
+      ? (totalOccupiedDays / totalDaysInMonth) * 100
       : 0;
 
     // Get unique berths count from current snapshot
@@ -160,31 +161,34 @@ export default function TimeBasedOccupancy({ onRefresh }: TimeBasedOccupancyProp
   const monthlyChartData = useMemo(() => {
     if (filteredData.length === 0) return [];
 
-    // Group by year-month and calculate average occupancy
-    const monthlyData = new Map<string, { year: number; month: number; occupancy: number; count: number }>();
+    // Group by year-month and calculate berth-days weighted occupancy
+    // Overall Occupancy = (Total OccupiedDays / Total DaysInMonth) × 100
+    const monthlyData = new Map<string, { year: number; month: number; totalOccupiedDays: number; totalDaysInMonth: number }>();
 
     filteredData.forEach(record => {
       const key = `${record.year}-${record.month}`;
       const existing = monthlyData.get(key);
 
       if (existing) {
-        existing.occupancy += record.occupancyPercent;
-        existing.count += 1;
+        existing.totalOccupiedDays += record.occupiedDays;
+        existing.totalDaysInMonth += record.daysInMonth;
       } else {
         monthlyData.set(key, {
           year: record.year,
           month: record.month,
-          occupancy: record.occupancyPercent,
-          count: 1,
+          totalOccupiedDays: record.occupiedDays,
+          totalDaysInMonth: record.daysInMonth,
         });
       }
     });
 
-    // Convert to array and calculate averages
+    // Convert to array and calculate berth-days weighted occupancy
     const chartData = Array.from(monthlyData.values())
       .map(item => ({
         month: `${item.month}/${item.year}`,
-        occupancy: Math.round((item.occupancy / item.count) * 10) / 10,
+        occupancy: item.totalDaysInMonth > 0
+          ? Math.round(((item.totalOccupiedDays / item.totalDaysInMonth) * 100) * 10) / 10
+          : 0,
       }))
       .sort((a, b) => {
         const [aMonth, aYear] = a.month.split('/').map(Number);
@@ -200,8 +204,8 @@ export default function TimeBasedOccupancy({ onRefresh }: TimeBasedOccupancyProp
   const berthTypeChartData = useMemo(() => {
     if (filteredData.length === 0) return [];
 
-    // Group by berth type and year-month
-    const berthTypeData = new Map<string, Map<string, { occupancy: number; count: number }>>();
+    // Group by berth type and year-month using berth-days weighting
+    const berthTypeData = new Map<string, Map<string, { totalOccupiedDays: number; totalDaysInMonth: number }>>();
 
     filteredData.forEach(record => {
       const berthType = record.berthType || 'Unknown';
@@ -215,12 +219,12 @@ export default function TimeBasedOccupancy({ onRefresh }: TimeBasedOccupancyProp
       const existing = timeMap.get(timeKey);
 
       if (existing) {
-        existing.occupancy += record.occupancyPercent;
-        existing.count += 1;
+        existing.totalOccupiedDays += record.occupiedDays;
+        existing.totalDaysInMonth += record.daysInMonth;
       } else {
         timeMap.set(timeKey, {
-          occupancy: record.occupancyPercent,
-          count: 1,
+          totalOccupiedDays: record.occupiedDays,
+          totalDaysInMonth: record.daysInMonth,
         });
       }
     });
@@ -238,14 +242,16 @@ export default function TimeBasedOccupancy({ onRefresh }: TimeBasedOccupancyProp
       return aMonth - bMonth;
     });
 
-    // Build chart data array
+    // Build chart data array using berth-days weighted occupancy
     const chartData = sortedTimePeriods.map(timeKey => {
       const dataPoint: any = { month: timeKey };
 
       berthTypeData.forEach((timeMap, berthType) => {
         const record = timeMap.get(timeKey);
         if (record) {
-          dataPoint[berthType] = Math.round((record.occupancy / record.count) * 10) / 10;
+          dataPoint[berthType] = record.totalDaysInMonth > 0
+            ? Math.round(((record.totalOccupiedDays / record.totalDaysInMonth) * 100) * 10) / 10
+            : 0;
         }
       });
 
@@ -278,17 +284,17 @@ export default function TimeBasedOccupancy({ onRefresh }: TimeBasedOccupancyProp
     if (filteredData.length === 0) return [];
 
     const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-    const monthlyOccupancy = new Map<number, { totalOccupancy: number; count: number }>();
+    const monthlyOccupancy = new Map<number, { totalOccupiedDays: number; totalDaysInMonth: number }>();
 
     filteredData.forEach(record => {
       const existing = monthlyOccupancy.get(record.month);
       if (existing) {
-        existing.totalOccupancy += record.occupancyPercent;
-        existing.count += 1;
+        existing.totalOccupiedDays += record.occupiedDays;
+        existing.totalDaysInMonth += record.daysInMonth;
       } else {
         monthlyOccupancy.set(record.month, {
-          totalOccupancy: record.occupancyPercent,
-          count: 1,
+          totalOccupiedDays: record.occupiedDays,
+          totalDaysInMonth: record.daysInMonth,
         });
       }
     });
@@ -296,7 +302,9 @@ export default function TimeBasedOccupancy({ onRefresh }: TimeBasedOccupancyProp
     return monthNames.map((name, index) => {
       const month = index + 1;
       const data = monthlyOccupancy.get(month);
-      const occupancy = data ? Math.round((data.totalOccupancy / data.count) * 10) / 10 : 0;
+      const occupancy = data && data.totalDaysInMonth > 0
+        ? Math.round(((data.totalOccupiedDays / data.totalDaysInMonth) * 100) * 10) / 10
+        : 0;
       return {
         month: name,
         occupancy,
@@ -324,21 +332,21 @@ export default function TimeBasedOccupancy({ onRefresh }: TimeBasedOccupancyProp
       record => record.year === mostRecentYear && record.month === mostRecentMonth
     );
 
-    // Group by berth type and calculate average occupancy
-    const berthTypeData = new Map<string, { totalOccupancy: number; count: number; berths: Set<string> }>();
+    // Group by berth type and calculate berth-days weighted occupancy
+    const berthTypeData = new Map<string, { totalOccupiedDays: number; totalDaysInMonth: number; berths: Set<string> }>();
 
     recentData.forEach(record => {
       const berthType = record.berthType || 'Unknown';
       const existing = berthTypeData.get(berthType);
 
       if (existing) {
-        existing.totalOccupancy += record.occupancyPercent;
-        existing.count += 1;
+        existing.totalOccupiedDays += record.occupiedDays;
+        existing.totalDaysInMonth += record.daysInMonth;
         existing.berths.add(record.berth);
       } else {
         berthTypeData.set(berthType, {
-          totalOccupancy: record.occupancyPercent,
-          count: 1,
+          totalOccupiedDays: record.occupiedDays,
+          totalDaysInMonth: record.daysInMonth,
           berths: new Set([record.berth]),
         });
       }
@@ -347,7 +355,9 @@ export default function TimeBasedOccupancy({ onRefresh }: TimeBasedOccupancyProp
     return Array.from(berthTypeData.entries()).map(([berthType, data]) => ({
       berthType,
       berths: data.berths.size,
-      occupancy: Math.round((data.totalOccupancy / data.count) * 10) / 10,
+      occupancy: data.totalDaysInMonth > 0
+        ? Math.round(((data.totalOccupiedDays / data.totalDaysInMonth) * 100) * 10) / 10
+        : 0,
     })).sort((a, b) => b.berths - a.berths);
   }, [filteredData]);
 
@@ -399,7 +409,7 @@ export default function TimeBasedOccupancy({ onRefresh }: TimeBasedOccupancyProp
             Data Last Updated: {lastUpdated ? lastUpdated.toLocaleString('en-NZ') : 'Unknown'}
           </p>
           <p className="text-xs text-gray-500 mt-2">
-            This data uses time-based occupancy calculation (occupied days / total berth-days)
+            This data uses berth-days weighted occupancy calculation (total occupied days / total available berth-days)
           </p>
         </div>
         <div className="flex space-x-2">
@@ -580,7 +590,7 @@ export default function TimeBasedOccupancy({ onRefresh }: TimeBasedOccupancyProp
       {/* Month-by-Month Occupancy Chart */}
       <div className="card">
         <div className="card-header">
-          <h3 className="card-title">Overall occupancy, month by month</h3>
+          <h3 className="card-title">Overall occupancy, month by month (berth-days weighted)</h3>
         </div>
         <div className="p-4">
           <ResponsiveContainer width="100%" height={400}>
@@ -617,7 +627,7 @@ export default function TimeBasedOccupancy({ onRefresh }: TimeBasedOccupancyProp
       <div className="card">
         <div className="card-header">
           <h3 className="card-title">Occupancy by berth type, year over year</h3>
-          <p className="text-sm text-gray-500">Annual occupancy by category</p>
+          <p className="text-sm text-gray-500">Annual occupancy by category (berth-days weighted)</p>
         </div>
         <div className="p-4">
           <ResponsiveContainer width="100%" height={400}>
@@ -659,7 +669,7 @@ export default function TimeBasedOccupancy({ onRefresh }: TimeBasedOccupancyProp
         <div className="card">
           <div className="card-header">
             <h3 className="card-title">Seasonal pattern</h3>
-            <p className="text-sm text-gray-500">Occupancy by month of year</p>
+            <p className="text-sm text-gray-500">Occupancy by month of year (berth-days weighted)</p>
           </div>
           <div className="p-4">
             <ResponsiveContainer width="100%" height={300}>
@@ -694,6 +704,7 @@ export default function TimeBasedOccupancy({ onRefresh }: TimeBasedOccupancyProp
         <div className="card">
           <div className="card-header">
             <h3 className="card-title">Current snapshot</h3>
+            <p className="text-sm text-gray-500">Berth-days weighted occupancy by type</p>
           </div>
           <div className="p-4">
             <table className="min-w-full divide-y divide-gray-200">
