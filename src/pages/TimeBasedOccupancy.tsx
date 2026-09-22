@@ -129,32 +129,18 @@ export default function TimeBasedOccupancy({ onRefresh }: TimeBasedOccupancyProp
       record => record.year === mostRecentYear && record.month === mostRecentMonth
     );
 
-    // Calculate fleet-wide occupancy as simple average of berth type occupancy percentages for current snapshot
-    const berthTypeOccupancy = new Map<string, { totalOccupancy: number; count: number }>();
+    // Calculate fleet-wide occupancy as simple average of all individual berth occupancy percentages
+    let totalOccupancySum = 0;
+    let recordCount = 0;
 
     currentSnapshot.forEach(record => {
-      const berthType = record.berthType || 'Unknown';
-      const existing = berthTypeOccupancy.get(berthType);
-
-      if (existing) {
-        existing.totalOccupancy += record.occupancyPercent;
-        existing.count += 1;
-      } else {
-        berthTypeOccupancy.set(berthType, {
-          totalOccupancy: record.occupancyPercent,
-          count: 1,
-        });
-      }
+      totalOccupancySum += record.occupancyPercent;
+      recordCount += 1;
     });
 
-    // Calculate average occupancy for each berth type
-    const berthTypeAverages = Array.from(berthTypeOccupancy.values()).map(
-      data => data.totalOccupancy / data.count
-    );
-
-    // Fleet-wide occupancy is the simple average of berth type averages for current snapshot
-    const fleetWideOccupancy = berthTypeAverages.length > 0
-      ? berthTypeAverages.reduce((sum, avg) => sum + avg, 0) / berthTypeAverages.length
+    // Fleet-wide occupancy is the simple average of all individual berth records
+    const fleetWideOccupancy = recordCount > 0
+      ? totalOccupancySum / recordCount
       : 0;
 
     // Get unique berths count from current snapshot
