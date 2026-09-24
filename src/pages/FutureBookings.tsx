@@ -18,6 +18,34 @@ export default function FutureBookings({ data, lastUpdated, onRefresh }: FutureB
     });
   }, [data]);
 
+  // Get latest rental dates for each berth from future records only
+  const latestRentalDates = useMemo(() => {
+    const latestByBerth = new Map<string, { dateIn: Date | null; dateOut: Date | null }>();
+
+    // Only consider future booking/rental records
+    const futureData = data.filter(record =>
+      record.occupancyStatus === 'Future Booking' || record.occupancyStatus === 'Future Rental'
+    );
+
+    futureData.forEach(record => {
+      const berthKey = record.berth || `${record.berthId}`;
+      const existing = latestByBerth.get(berthKey);
+
+      // Use dateIn primarily to determine latest rental (rental that starts later is more "future")
+      const currentRecordDate = record.dateIn?.getTime() ?? 0;
+      const existingRecordDate = existing?.dateIn?.getTime() ?? 0;
+
+      if (!existing || currentRecordDate > existingRecordDate) {
+        latestByBerth.set(berthKey, {
+          dateIn: record.dateIn,
+          dateOut: record.dateOut
+        });
+      }
+    });
+
+    return latestByBerth;
+  }, [data]);
+
   const bookingCount = futureRecords.filter(r => r.occupancyStatus === 'Future Booking').length;
   const rentalCount = futureRecords.filter(r => r.occupancyStatus === 'Future Rental').length;
 
@@ -109,8 +137,8 @@ export default function FutureBookings({ data, lastUpdated, onRefresh }: FutureB
                     </td>
                     <td className="px-4 py-3 text-sm text-slate-600">{record.customerName || '—'}</td>
                     <td className="px-4 py-3 text-sm text-slate-600">{record.vesselName || '—'}</td>
-                    <td className="px-4 py-3 text-sm text-slate-600">{formatDate(record.dateIn)}</td>
-                    <td className="px-4 py-3 text-sm text-slate-600">{formatDate(record.dateOut)}</td>
+                    <td className="px-4 py-3 text-sm text-slate-600">{formatDate(latestRentalDates.get(record.berth || `${record.berthId}`)?.dateIn || null)}</td>
+                    <td className="px-4 py-3 text-sm text-slate-600">{formatDate(latestRentalDates.get(record.berth || `${record.berthId}`)?.dateOut || null)}</td>
                     <td className="px-4 py-3 text-sm text-slate-600">{formatDate(record.bookingEnteredDate)}</td>
                   </tr>
                 ))
