@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { BerthRecord } from '../types/berth';
-import { calculateKPIMetrics, calculatePierOccupancy, calculateBerthTypeOccupancy, calculateOwnershipOccupancy, exportToCSV } from '../utils/dataUtils';
+import { calculateKPIMetrics, calculatePierOccupancy, calculateBerthTypeOccupancy, calculateOwnershipOccupancy, exportToCSV, getUniqueCustomerAges } from '../utils/dataUtils';
 
 interface ReportsProps {
   data: BerthRecord[];
@@ -9,20 +9,6 @@ interface ReportsProps {
 }
 
 type ReportType = 'masterSummary' | 'occupancy' | 'availability' | 'pier' | 'ownership' | 'berthType' | 'futureStatus' | 'customerAge';
-
-const calculateCustomerAge = (dateOfBirth: Date | null): number | null => {
-  if (!dateOfBirth || Number.isNaN(dateOfBirth.getTime())) return null;
-
-  const today = new Date();
-  let age = today.getFullYear() - dateOfBirth.getFullYear();
-  const monthDiff = today.getMonth() - dateOfBirth.getMonth();
-
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dateOfBirth.getDate())) {
-    age -= 1;
-  }
-
-  return age;
-};
 
 export default function Reports({ data, lastUpdated, onRefresh }: ReportsProps) {
   const [selectedReport, setSelectedReport] = useState<ReportType>('masterSummary');
@@ -33,9 +19,8 @@ export default function Reports({ data, lastUpdated, onRefresh }: ReportsProps) 
     const ownershipData = calculateOwnershipOccupancy(data);
     const berthTypeData = calculateBerthTypeOccupancy(data);
     const futureRecords = data.filter(r => r.occupancyStatus === 'Future Booking' || r.occupancyStatus === 'Future Rental');
-    const validAges = data
-      .map(record => calculateCustomerAge(record.customerDateOfBirth))
-      .filter((age): age is number => age !== null);
+    const validAges = getUniqueCustomerAges(data);
+    const uniqueCustomers = new Set(data.map(r => r.customerId).filter(Boolean)).size;
 
     const topPier = pierData.length > 0
       ? pierData.reduce((max, pier) => pier.occupancyPercentage > max.occupancyPercentage ? pier : max)
@@ -85,7 +70,7 @@ export default function Reports({ data, lastUpdated, onRefresh }: ReportsProps) 
         section: 'Customers',
         metric: 'Customers With DOB',
         value: validAges.length,
-        details: `${data.length > 0 ? ((validAges.length / data.length) * 100).toFixed(1) : '0.0'}% of all records`,
+        details: `${uniqueCustomers > 0 ? ((validAges.length / uniqueCustomers) * 100).toFixed(1) : '0.0'}% of unique customers`,
       },
       {
         section: 'Customers',
@@ -179,15 +164,15 @@ export default function Reports({ data, lastUpdated, onRefresh }: ReportsProps) 
   };
 
   const generateCustomerAgeReport = () => {
-    const validRecords = data.filter(r => r.customerDateOfBirth && !Number.isNaN(r.customerDateOfBirth.getTime()));
+    const validAges = getUniqueCustomerAges(data);
 
-    if (validRecords.length === 0) {
+    if (validAges.length === 0) {
       return [{ ageBand: 'No DOB data', customerCount: 0, percentage: 0 }];
     }
 
+    // Same bands as the Customer Age Report page.
     const ageBands = [
-      { label: 'Under 18', min: 0, max: 17 },
-      { label: '18-24', min: 18, max: 24 },
+      { label: '20-24', min: 20, max: 24 },
       { label: '25-34', min: 25, max: 34 },
       { label: '35-44', min: 35, max: 44 },
       { label: '45-54', min: 45, max: 54 },
@@ -196,27 +181,18 @@ export default function Reports({ data, lastUpdated, onRefresh }: ReportsProps) 
     ];
 
     const rows = ageBands.map(band => {
-      const customerCount = validRecords.filter(record => {
-        const age = calculateCustomerAge(record.customerDateOfBirth);
-        return age !== null && age >= band.min && age <= band.max;
-      }).length;
-
-      const percentage = (customerCount / validRecords.length) * 100;
-
+      const customerCount = validAges.filter(age => age >= band.min && age <= band.max).length;
       return {
         ageBand: band.label,
         customerCount,
-        percentage: Number(percentage.toFixed(1)),
+        percentage: Number(((customerCount / validAges.length) * 100).toFixed(1)),
       };
     }).filter(row => row.customerCount > 0);
 
-    const averageAge = validRecords.reduce((sum, record) => {
-      const age = calculateCustomerAge(record.customerDateOfBirth);
-      return sum + (age ?? 0);
-    }, 0) / validRecords.length;
+    const averageAge = validAges.reduce((sum, age) => sum + age, 0) / validAges.length;
 
     return [
-      { ageBand: 'Customers with DOB', customerCount: validRecords.length, percentage: 100 },
+      { ageBand: 'Customers with DOB', customerCount: validAges.length, percentage: 100 },
       { ageBand: 'Average Age', customerCount: Number(averageAge.toFixed(1)), percentage: 0 },
       ...rows,
     ];

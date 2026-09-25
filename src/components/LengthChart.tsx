@@ -12,7 +12,7 @@ export default function LengthChart({ data }: LengthChartProps) {
   return (
     <div className="card">
       <div className="card-header">
-        <h3 className="card-title">Occupancy by Actual Berth Length</h3>
+        <h3 className="card-title">Occupancy by Nominal Berth Length</h3>
       </div>
       <ResponsiveContainer width="100%" height={360}>
         <BarChart data={lengthData}>

@@ -74,6 +74,25 @@ export interface ReversionRecord {
   reversionPeriod?: string | null;
   berthOwner?: string | null;
   ownershipCustomer?: string | null;
+  // WEMT reversion query columns (null when the workbook predates that query)
+  occupierId?: string | null;
+  endsAtReversion?: boolean | null;
+  hasSep30Rental?: boolean | null;
+  nextRentalStatus?: string | null;
+  nextOccupierId?: string | null;
+  nextOccupier?: string | null;
+  nextOccupierType?: string | null;
+  nextRentalStartDate?: Date | null;
+  nextRentalEndDate?: Date | null;
+  nextRentalAgreementId?: string | null;
+  sep30LineCount?: number | null;
+  reversionOutcome?: string | null;
+  newOwnershipType?: string | null;
+  newOwner?: string | null;
+  // Worked out by the Reversion page: the same customer ends one berth 28-30 Sep
+  // and starts on a different berth 30 Sep.
+  relocatedFrom?: string[];
+  relocatingTo?: string[];
 }
 
 export type OccupancyStatus = 'Available' | 'Rented' | 'Booked' | 'Future Booking' | 'Future Rental';

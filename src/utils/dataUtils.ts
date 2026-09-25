@@ -7,7 +7,7 @@ export function filterData(data: BerthRecord[], filters: FilterState): BerthReco
     if (!record) return false;
     
     if (filters.marina && record.marina !== filters.marina) return false;
-    if (filters.pier && record.pier !== filters.pier) return false;
+    if (filters.pier && String(record.pier) !== String(filters.pier)) return false;
     if (filters.berth && record.berth !== filters.berth) return false;
     if (filters.berthType && filters.berthType.length > 0 && !filters.berthType.includes(record.berthType)) return false;
     if (filters.ownershipType && filters.ownershipType.length > 0 && !filters.ownershipType.includes(record.ownershipType)) return false;
@@ -47,48 +47,19 @@ export function calculateKPIMetrics(data: BerthRecord[]): KPIMetrics {
 
   const vesselRecords = data.filter(r => r.occupancyStatus === 'Rented' && r.vesselName);
   const compliantVessels = vesselRecords.filter((record) => {
-    const today = new Date();
-    const warningDate = new Date();
-    warningDate.setDate(today.getDate() + 30);
-
-    const getStatus = (expiryDate: Date | null, isRequired: boolean) => {
-      if (!isRequired) return 'Valid';
-      if (!expiryDate) return 'Expired';
-      if (expiryDate < today) return 'Expired';
-      if (expiryDate <= warningDate) return 'Expiring Soon';
-      return 'Valid';
-    };
-
-    const insuranceStatus = getStatus(record.insuranceExpiry, true);
-    const ewofStatus = getStatus(record.ewofExpiry, Boolean(record.ewofRequired));
-    const tntStatus = getStatus(record.tntExpiry, Boolean(record.tntRequired));
-
-    const hasExpired = insuranceStatus === 'Expired' || ewofStatus === 'Expired' || tntStatus === 'Expired';
-    const hasWarning = insuranceStatus === 'Expiring Soon' || ewofStatus === 'Expiring Soon' || tntStatus === 'Expiring Soon';
-
-    return !hasExpired && !hasWarning;
+    const statuses = [
+      getExpiryStatus(record.insuranceExpiry, true),
+      getExpiryStatus(record.ewofExpiry, Boolean(record.ewofRequired)),
+      getExpiryStatus(record.tntExpiry, Boolean(record.tntRequired)),
+    ];
+    return statuses.every(status => status === 'Valid' || status === 'Not Required');
   }).length;
 
   const vesselComplianceRate = vesselRecords.length > 0
     ? (compliantVessels / vesselRecords.length) * 100
     : 0;
 
-  const validAges = data
-    .map((record) => {
-      const dob = record.customerDateOfBirth;
-      if (!dob || Number.isNaN(dob.getTime())) return null;
-
-      const today = new Date();
-      let age = today.getFullYear() - dob.getFullYear();
-      const monthDiff = today.getMonth() - dob.getMonth();
-
-      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
-        age -= 1;
-      }
-
-      return age;
-    })
-    .filter((age): age is number => age !== null && age >= 20);
+  const validAges = getUniqueCustomerAges(data);
 
   const averageAge = validAges.length > 0
     ? validAges.reduce((sum, age) => sum + age, 0) / validAges.length
@@ -138,13 +109,7 @@ export function calculatePierOccupancy(data: BerthRecord[]): PierOccupancy[] {
     occupancyPercentage: pier.totalBerths > 0 
       ? Math.round(((pier.occupied + pier.booked) / pier.totalBerths) * 1000) / 10 
       : 0,
-  })).sort((a, b) => {
-    // Sort strings alphabetically, numbers numerically
-    if (typeof a.pier === 'string' && typeof b.pier === 'string') {
-      return a.pier.localeCompare(b.pier);
-    }
-    return Number(a.pier) - Number(b.pier);
-  });
+  })).sort((a, b) => naturalCompare(a.pier, b.pier));
 }
 
 export function calculateBerthTypeOccupancy(data: BerthRecord[]): BerthTypeOccupancy[] {
@@ -339,40 +304,93 @@ export function getUniqueValues<T>(data: BerthRecord[], key: keyof BerthRecord):
     }
   });
   
-  // Sort strings alphabetically, numbers numerically
-  const sortedArray = Array.from(values);
-  if (sortedArray.length > 0 && typeof sortedArray[0] === 'string') {
-    return sortedArray.sort() as T[];
-  }
-  return sortedArray.sort((a, b) => Number(a) - Number(b)) as T[];
+  return Array.from(values).sort((a, b) => naturalCompare(a, b)) as T[];
 }
 
-export function getFutureAvailability(data: BerthRecord[], targetDate: Date): BerthRecord[] {
-  if (!data || data.length === 0) return [];
-  if (!targetDate) return data.filter(r => r.berthStatus === 'Active');
+export type ProjectedStatus = 'Rented' | 'Booked' | 'Available';
 
-  return data.filter(record => {
-    if (!record) return false;
-    if (record.berthStatus !== 'Active') return false;
+/**
+ * Projects each berth's status on a given date from the single current/next
+ * agreement the master query returns per berth. A berth is Rented/Booked when
+ * the date falls inside that agreement's DateIn–DateOut window, otherwise it is
+ * treated as available. Agreements that follow the one in the export are not
+ * visible, so dates beyond DateOut may be optimistic.
+ */
+export function getProjectedStatus(record: BerthRecord, targetDate: Date): ProjectedStatus {
+  const target = startOfDay(targetDate).getTime();
+  const dateIn = record.dateIn ? startOfDay(record.dateIn).getTime() : null;
+  // DateOut is parsed onto the day after an end-of-day (23:59:59) timestamp, so
+  // the berth is free from that day onward.
+  const dateOut = record.dateOut ? record.dateOut.getTime() : null;
 
-    const dateIn = record.dateIn;
-    const dateOut = record.dateOut;
+  if (dateIn === null || target < dateIn) return 'Available';
+  if (dateOut !== null && target >= dateOut) return 'Available';
 
-    // If no dates, consider available
-    if (!dateIn && !dateOut) return true;
+  const status = record.occupancyStatus;
+  if (status === 'Rented' || status === 'Future Rental') return 'Rented';
+  if (status === 'Booked' || status === 'Future Booking') return 'Booked';
+  return 'Available';
+}
 
-    // If target date is within a rental/booking period, it's not available
-    if (dateIn && dateOut) {
-      return targetDate < dateIn || targetDate > dateOut;
-    }
+export function startOfDay(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
 
-    // If only dateIn exists, consider unavailable after that date
-    if (dateIn && !dateOut) {
-      return targetDate < dateIn;
-    }
+export type ExpiryStatus = 'Valid' | 'Expiring Soon' | 'Expired' | 'Missing' | 'Not Required';
 
-    return true;
+/**
+ * Mirrors the master query's compliance CASE logic: compares on date only, an
+ * expiry of today is still valid-but-expiring, and a required document with no
+ * expiry is reported as Missing rather than Expired.
+ */
+export function getExpiryStatus(expiryDate: Date | null, isRequired: boolean, warningDays = 30): ExpiryStatus {
+  if (!isRequired) return 'Not Required';
+  if (!expiryDate) return 'Missing';
+
+  const today = startOfDay(new Date());
+  const warningDate = new Date(today);
+  warningDate.setDate(today.getDate() + warningDays);
+  const expiry = startOfDay(expiryDate);
+
+  if (expiry < today) return 'Expired';
+  if (expiry <= warningDate) return 'Expiring Soon';
+  return 'Valid';
+}
+
+export function calculateAge(dateOfBirth: Date | null): number | null {
+  if (!dateOfBirth || Number.isNaN(dateOfBirth.getTime())) return null;
+
+  const today = new Date();
+  let age = today.getFullYear() - dateOfBirth.getFullYear();
+  const monthDiff = today.getMonth() - dateOfBirth.getMonth();
+
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dateOfBirth.getDate())) {
+    age -= 1;
+  }
+
+  return age;
+}
+
+/**
+ * Ages of distinct customers (a customer holding several berths is counted
+ * once). Ages under 20 are excluded as they come from placeholder or
+ * mistyped DOBs in the source data.
+ */
+export function getUniqueCustomerAges(data: BerthRecord[]): number[] {
+  const ageByCustomer = new Map<string, number>();
+
+  data.forEach((record, index) => {
+    const age = calculateAge(record.customerDateOfBirth);
+    if (age === null || age < 20) return;
+    const key = record.customerId || record.customerName || `row-${index}`;
+    if (!ageByCustomer.has(key)) ageByCustomer.set(key, age);
   });
+
+  return [...ageByCustomer.values()];
+}
+
+function naturalCompare(a: unknown, b: unknown): number {
+  return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
 }
 
 export function formatDate(date: Date | null): string {

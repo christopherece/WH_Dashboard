@@ -9,7 +9,7 @@ interface BerthTypeChartProps {
 export default function BerthTypeChart({ data }: BerthTypeChartProps) {
   const typeData = calculateBerthTypeOccupancy(data);
 
-  const COLORS = ['#1e40af', '#7c3aed', '#db2777', '#dc2626', '#ea580c', '#16a34a', '#0891b2', '#65a30d'];
+  const COLORS = ['#1e40af', '#7c3aed', '#db2777', '#dc2626', '#ea580c', '#16a34a', '#0891b2', '#65a30d', '#ca8a04', '#475569'];
 
   return (
     <div className="card">

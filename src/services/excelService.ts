@@ -394,7 +394,9 @@ export class ExcelService {
         return {
           berthId: this.parseNumber(this.getFirstValue(normalizedRow, ['BerthID', 'ID', 'Id'])),
           berth: berth,
-          pier: this.parseStringOrNumber(this.getFirstValue(normalizedRow, ['Pier', 'PIER'])),
+          // Keep pier as text: the query returns mixed codes ("3", "A", "F1") and the
+          // filter dropdowns hand back strings, so numeric piers would never match.
+          pier: this.parseString(this.getFirstValue(normalizedRow, ['Pier', 'PIER'])),
           berthType: this.parseString(this.getFirstValue(normalizedRow, ['BerthType', 'Type', 'TYPE'])),
           nominalLength: this.parseNumber(this.getFirstValue(normalizedRow, ['NominalLength', 'Length', 'LENGTH'])),
           nominalWidth: this.parseNumber(this.getFirstValue(normalizedRow, ['NominalWidth', 'Width'])),
@@ -517,13 +519,13 @@ export class ExcelService {
       const ownershipType = this.resolveOwnershipType(rawOwnership, ownershipCustomerId);
 
       const ownershipDescription = this.parseString(rawOwnership).toUpperCase();
-      const trustGroup = ownershipDescription.startsWith('WEMT')
+      const trustGroup = this.parseNullableString(this.getFirstValue(normalizedRow, ['TrustGroup'])) || (ownershipDescription.startsWith('WEMT')
         ? 'WEMT'
         : ownershipDescription.startsWith('WEXT')
           ? 'WEXT'
           : ownershipDescription.includes('MARINA')
             ? 'Marina Trust'
-            : 'Other';
+            : 'Other');
 
       const rentalStatus = this.parseString(this.getFirstValue(normalizedRow, ['RentalStatus', 'sdStatus', 'OccupancyStatus', 'Status']));
       const rentalLineType = this.parseString(this.getFirstValue(normalizedRow, ['RentalLineType', 'SDLineType', 'sdLineType', 'ServiceLineType', 'ResourceLineType']));
@@ -541,7 +543,7 @@ export class ExcelService {
           case 'RESOURCE_PVT':
             return 'Private Renter';
           default:
-            return rentalLineType || 'Other';
+            return rentalLineType || null; // vacant berths have no line type
         }
       })();
 
@@ -565,6 +567,13 @@ export class ExcelService {
       const occupier = this.parseNullableString(this.getFirstValue(normalizedRow, ['Renter', 'Occupier', 'VesselName', 'CustomerName', 'rc.mmcuLongName', 'Customer']));
       const rentalPeriod = this.parseNullableString(this.getFirstValue(normalizedRow, ['RentalPeriod']));
       const reversionPeriod = this.parseNullableString(this.getFirstValue(normalizedRow, ['ReversionPeriod']));
+
+      // Columns from the WEMT reversion query; all stay null on older exports.
+      const occupierId = this.parseNullableString(this.getFirstValue(normalizedRow, ['OccupierID']));
+      const nextOccupierId = this.parseNullableString(this.getFirstValue(normalizedRow, ['NextOccupierID']));
+      const hasSep30Rental = this.parseYesNo(this.getFirstValue(normalizedRow, ['HasSep30Rental']));
+      const reversionOutcome = this.parseNullableString(this.getFirstValue(normalizedRow, ['ReversionOutcome']))
+        ?? this.deriveReversionOutcome(occupancyStatus, hasSep30Rental, occupierId, nextOccupierId);
 
       return {
         trustGroup,
@@ -590,15 +599,52 @@ export class ExcelService {
         reversionPeriod,
         berthOwner,
         ownershipCustomer,
+        occupierId,
+        endsAtReversion: this.parseYesNo(this.getFirstValue(normalizedRow, ['EndsSep28to29'])),
+        hasSep30Rental,
+        nextRentalStatus: this.parseNullableString(this.getFirstValue(normalizedRow, ['NextRentalStatus'])),
+        nextOccupierId,
+        nextOccupier: this.parseNullableString(this.getFirstValue(normalizedRow, ['NextOccupier'])),
+        nextOccupierType: this.parseNullableString(this.getFirstValue(normalizedRow, ['NextOccupierType'])),
+        nextRentalStartDate: this.parseDate(this.getFirstValue(normalizedRow, ['NextRentalStartDate'])),
+        nextRentalEndDate: this.parseDate(this.getFirstValue(normalizedRow, ['NextRentalEndDate'])),
+        nextRentalAgreementId: this.parseNullableString(this.getFirstValue(normalizedRow, ['NextRentalAgreementID'])),
+        sep30LineCount: this.getFirstValue(normalizedRow, ['Sep30LineCount']) === undefined
+          ? null
+          : this.parseNumber(this.getFirstValue(normalizedRow, ['Sep30LineCount'])),
+        reversionOutcome,
+        newOwnershipType: this.parseNullableString(this.getFirstValue(normalizedRow, ['NewOwnershipType'])),
+        newOwner: this.parseNullableString(this.getFirstValue(normalizedRow, ['NewOwner'])),
       };
     }).filter((record) => record.berth);
+  }
+
+  private deriveReversionOutcome(
+    occupancyStatus: string,
+    hasSep30Rental: boolean | null,
+    occupierId: string | null,
+    nextOccupierId: string | null
+  ): string | null {
+    if (hasSep30Rental === null) return null;
+    const vacant = occupancyStatus === 'Vacant';
+    if (vacant) return hasSep30Rental ? 'Vacant - New Rental 30 Sep' : 'Vacant - No 30 Sep Rental';
+    if (!hasSep30Rental) return 'Not Continuing';
+    return occupierId && occupierId === nextOccupierId ? 'Continuing - Same Customer' : 'Continuing - New Customer';
+  }
+
+  private parseYesNo(value: any): boolean | null {
+    if (value === null || value === undefined || value === '' || value === 'NULL') return null;
+    const normalized = String(value).trim().toUpperCase();
+    if (['YES', 'Y', 'TRUE', '1'].includes(normalized)) return true;
+    if (['NO', 'N', 'FALSE', '0'].includes(normalized)) return false;
+    return null;
   }
 
   private getDefaultRecord(): BerthRecord {
     return {
       berthId: 0,
       berth: '',
-      pier: 0,
+      pier: '',
       berthType: '',
       nominalLength: 0,
       nominalWidth: 0,

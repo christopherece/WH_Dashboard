@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { BerthRecord, FilterState } from '../types/berth';
-import { getFutureAvailability, filterData } from '../utils/dataUtils';
+import { getProjectedStatus, filterData } from '../utils/dataUtils';
 
 interface FutureAvailabilityProps {
   allData: BerthRecord[];
@@ -12,14 +12,24 @@ interface FutureAvailabilityProps {
 export default function FutureAvailability({ allData, filters, lastUpdated, onRefresh }: FutureAvailabilityProps) {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
-  const futureData = getFutureAvailability(allData, selectedDate);
-  const filteredFutureData = filterData(futureData, filters);
+  // Project every active berth onto the selected date. The occupancy-status
+  // filter describes today's status, so it is not applied to a projection.
+  const berthsInScope = filterData(allData, { ...filters, occupancyStatus: null })
+    .filter(r => r.berthStatus === 'Active');
+  const projected = berthsInScope.map(r => getProjectedStatus(r, selectedDate));
 
-  const occupied = filteredFutureData.filter(r => r.occupancyStatus === 'Rented').length;
-  const booked = filteredFutureData.filter(r => r.occupancyStatus === 'Booked').length;
-  const available = filteredFutureData.filter(r => r.occupancyStatus === 'Available').length;
-  const total = filteredFutureData.length;
+  const occupied = projected.filter(s => s === 'Rented').length;
+  const booked = projected.filter(s => s === 'Booked').length;
+  const available = projected.filter(s => s === 'Available').length;
+  const total = berthsInScope.length;
   const occupancyPercentage = total > 0 ? ((occupied + booked) / total) * 100 : 0;
+
+  // Build yyyy-mm-dd from local parts; toISOString() is UTC and shows the
+  // previous day for most of the morning in NZ.
+  const toInputValue = (date: Date) => {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  };
 
   const formatDate = (date: Date) => {
     return date.toLocaleDateString('en-NZ', { day: '2-digit', month: 'long', year: 'numeric' });
@@ -44,7 +54,7 @@ export default function FutureAvailability({ allData, filters, lastUpdated, onRe
 
       <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
         <p className="text-sm text-yellow-800">
-          <strong>Currently Projected Availability</strong> - Future availability is based on bookings and rentals currently recorded in the source data and may change.
+          <strong>Currently Projected Availability</strong> - Future availability is based on each berth's current or next booking/rental in the source data. Agreements after that one are not in the export, so projections far ahead may overstate availability.
         </p>
       </div>
 
@@ -54,8 +64,12 @@ export default function FutureAvailability({ allData, filters, lastUpdated, onRe
         </div>
         <input
           type="date"
-          value={selectedDate.toISOString().split('T')[0]}
-          onChange={(e) => setSelectedDate(new Date(e.target.value))}
+          value={toInputValue(selectedDate)}
+          onChange={(e) => {
+            if (!e.target.value) return;
+            const [year, month, day] = e.target.value.split('-').map(Number);
+            setSelectedDate(new Date(year, month - 1, day));
+          }}
           className="input max-w-xs"
         />
       </div>

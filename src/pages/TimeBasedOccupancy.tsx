@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { TimeBasedOccupancyRecord } from '../types/berth';
 import { exportToCSV } from '../utils/dataUtils';
 import { excelService } from '../services/excelService';
+import { buildOccupancyReport, formatPct, formatPts, SMALL_SAMPLE_BERTHS } from '../utils/occupancyAnalytics';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts';
 
 interface TimeBasedOccupancyProps {
@@ -97,175 +98,33 @@ export default function TimeBasedOccupancy({ onRefresh }: TimeBasedOccupancyProp
     return Array.from(berthTypes).sort();
   }, [data]);
 
-  // Calculate aggregate metrics for KPI cards
-  const aggregateMetrics = useMemo(() => {
-    if (filteredData.length === 0) {
-      return {
-        fleetWideOccupancy: 0,
-        totalBerths: 0,
-        categories: 0,
-      };
-    }
+  // Berth-days weighted report metrics (latest complete month, trends, per-type and seasonal breakdowns)
+  const report = useMemo(() => buildOccupancyReport(filteredData), [filteredData]);
 
-    // Find the most recent time period for current snapshot metrics
-    const sortedData = [...filteredData].sort((a, b) => {
-      if (a.year !== b.year) return b.year - a.year;
-      return b.month - a.month;
-    });
+  // Month-by-month chart with 12-month rolling average; partial months flagged
+  const monthlyChartData = useMemo(() => report.months.map((m, i) => ({
+    month: m.label,
+    occupancy: Math.round(m.occupancy * 10) / 10,
+    rolling: report.rolling12[i] == null ? null : Math.round(report.rolling12[i]! * 10) / 10,
+    partial: !m.complete,
+  })), [report]);
 
-    if (sortedData.length === 0) {
-      return {
-        fleetWideOccupancy: 0,
-        totalBerths: 0,
-        categories: 0,
-      };
-    }
+  // Largest (non-small-sample) categories, annual occupancy
+  const largestTypes = useMemo(
+    () => report.byType.filter(t => !t.smallSample).slice(0, 4),
+    [report]
+  );
 
-    const mostRecentYear = sortedData[0].year;
-    const mostRecentMonth = sortedData[0].month;
-
-    // Filter to only the most recent period for current snapshot metrics
-    const currentSnapshot = filteredData.filter(
-      record => record.year === mostRecentYear && record.month === mostRecentMonth
-    );
-
-    // Calculate fleet-wide occupancy using berth-days weighting (capacity-weighted)
-    // Overall Occupancy = (Total OccupiedDays / Total DaysInMonth) × 100
-    let totalOccupiedDays = 0;
-    let totalDaysInMonth = 0;
-
-    currentSnapshot.forEach(record => {
-      totalOccupiedDays += record.occupiedDays;
-      totalDaysInMonth += record.daysInMonth;
-    });
-
-    // Fleet-wide occupancy using berth-days weighting
-    const fleetWideOccupancy = totalDaysInMonth > 0
-      ? (totalOccupiedDays / totalDaysInMonth) * 100
-      : 0;
-
-    // Get unique berths count from current snapshot
-    const uniqueBerths = new Set(currentSnapshot.map(r => r.berth)).size;
-
-    // Count unique berth types as categories from current snapshot
-    const categories = new Set(currentSnapshot.map(r => r.berthType)).size;
-
-    return {
-      fleetWideOccupancy: Math.round(fleetWideOccupancy * 10) / 10,
-      totalBerths: uniqueBerths,
-      categories,
+  const annualChartData = useMemo(() => report.years.map(year => {
+    const point: Record<string, number | string | null> = {
+      year: report.partialYears[year] ? `${year}*` : String(year),
     };
-  }, [filteredData]);
-
-  // Prepare data for month-by-month chart
-  const monthlyChartData = useMemo(() => {
-    if (filteredData.length === 0) return [];
-
-    // Group by year-month and calculate berth-days weighted occupancy
-    // Overall Occupancy = (Total OccupiedDays / Total DaysInMonth) × 100
-    const monthlyData = new Map<string, { year: number; month: number; totalOccupiedDays: number; totalDaysInMonth: number }>();
-
-    filteredData.forEach(record => {
-      const key = `${record.year}-${record.month}`;
-      const existing = monthlyData.get(key);
-
-      if (existing) {
-        existing.totalOccupiedDays += record.occupiedDays;
-        existing.totalDaysInMonth += record.daysInMonth;
-      } else {
-        monthlyData.set(key, {
-          year: record.year,
-          month: record.month,
-          totalOccupiedDays: record.occupiedDays,
-          totalDaysInMonth: record.daysInMonth,
-        });
-      }
+    largestTypes.forEach(t => {
+      const v = t.annual[year];
+      point[t.berthType] = v == null ? null : Math.round(v * 10) / 10;
     });
-
-    // Convert to array and calculate berth-days weighted occupancy
-    const chartData = Array.from(monthlyData.values())
-      .map(item => ({
-        month: `${item.month}/${item.year}`,
-        occupancy: item.totalDaysInMonth > 0
-          ? Math.round(((item.totalOccupiedDays / item.totalDaysInMonth) * 100) * 10) / 10
-          : 0,
-      }))
-      .sort((a, b) => {
-        const [aMonth, aYear] = a.month.split('/').map(Number);
-        const [bMonth, bYear] = b.month.split('/').map(Number);
-        if (aYear !== bYear) return aYear - bYear;
-        return aMonth - bMonth;
-      });
-
-    return chartData;
-  }, [filteredData]);
-
-  // Prepare data for berth type over time chart
-  const berthTypeChartData = useMemo(() => {
-    if (filteredData.length === 0) return [];
-
-    // Group by berth type and year-month using berth-days weighting
-    const berthTypeData = new Map<string, Map<string, { totalOccupiedDays: number; totalDaysInMonth: number }>>();
-
-    filteredData.forEach(record => {
-      const berthType = record.berthType || 'Unknown';
-      const timeKey = `${record.month}/${record.year}`;
-
-      if (!berthTypeData.has(berthType)) {
-        berthTypeData.set(berthType, new Map());
-      }
-
-      const timeMap = berthTypeData.get(berthType)!;
-      const existing = timeMap.get(timeKey);
-
-      if (existing) {
-        existing.totalOccupiedDays += record.occupiedDays;
-        existing.totalDaysInMonth += record.daysInMonth;
-      } else {
-        timeMap.set(timeKey, {
-          totalOccupiedDays: record.occupiedDays,
-          totalDaysInMonth: record.daysInMonth,
-        });
-      }
-    });
-
-    // Get all unique time periods
-    const allTimePeriods = new Set<string>();
-    berthTypeData.forEach(timeMap => {
-      timeMap.forEach((_, timeKey) => allTimePeriods.add(timeKey));
-    });
-
-    const sortedTimePeriods = Array.from(allTimePeriods).sort((a, b) => {
-      const [aMonth, aYear] = a.split('/').map(Number);
-      const [bMonth, bYear] = b.split('/').map(Number);
-      if (aYear !== bYear) return aYear - bYear;
-      return aMonth - bMonth;
-    });
-
-    // Build chart data array using berth-days weighted occupancy
-    const chartData = sortedTimePeriods.map(timeKey => {
-      const dataPoint: any = { month: timeKey };
-
-      berthTypeData.forEach((timeMap, berthType) => {
-        const record = timeMap.get(timeKey);
-        if (record) {
-          dataPoint[berthType] = record.totalDaysInMonth > 0
-            ? Math.round(((record.totalOccupiedDays / record.totalDaysInMonth) * 100) * 10) / 10
-            : 0;
-        }
-      });
-
-      return dataPoint;
-    });
-
-    return chartData;
-  }, [filteredData]);
-
-  // Get unique berth types for the chart
-  const chartBerthTypes = useMemo(() => {
-    const types = new Set(filteredData.map(r => r.berthType));
-    return Array.from(types).sort();
-  }, [filteredData]);
+    return point;
+  }), [report, largestTypes]);
 
   // Color mapping for berth types
   const berthTypeColors: Record<string, string> = {
@@ -279,88 +138,21 @@ export default function TimeBasedOccupancy({ onRefresh }: TimeBasedOccupancyProp
     return berthTypeColors[berthType] || '#6366f1'; // default purple
   };
 
-  // Prepare data for seasonal pattern chart (occupancy by month of year)
-  const seasonalPatternData = useMemo(() => {
-    if (filteredData.length === 0) return [];
+  const seasonalPatternData = useMemo(() => report.seasonal.map(s => ({
+    month: s.month,
+    occupancy: s.occupancy == null ? 0 : Math.round(s.occupancy * 10) / 10,
+  })), [report]);
 
-    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-    const monthlyOccupancy = new Map<number, { totalOccupiedDays: number; totalDaysInMonth: number }>();
+  const renderDelta = (value: number | null, suffix = '') => {
+    if (value == null) return <span className="text-slate-400">—</span>;
+    const r = Math.round(value * 10) / 10;
+    const cls = r > 0 ? 'text-emerald-600' : r < 0 ? 'text-rose-600' : 'text-slate-500';
+    const icon = r > 0 ? '▲' : r < 0 ? '▼' : '▬';
+    return <span className={`${cls} font-medium whitespace-nowrap`}>{icon} {formatPts(value)}{suffix}</span>;
+  };
 
-    filteredData.forEach(record => {
-      const existing = monthlyOccupancy.get(record.month);
-      if (existing) {
-        existing.totalOccupiedDays += record.occupiedDays;
-        existing.totalDaysInMonth += record.daysInMonth;
-      } else {
-        monthlyOccupancy.set(record.month, {
-          totalOccupiedDays: record.occupiedDays,
-          totalDaysInMonth: record.daysInMonth,
-        });
-      }
-    });
-
-    return monthNames.map((name, index) => {
-      const month = index + 1;
-      const data = monthlyOccupancy.get(month);
-      const occupancy = data && data.totalDaysInMonth > 0
-        ? Math.round(((data.totalOccupiedDays / data.totalDaysInMonth) * 100) * 10) / 10
-        : 0;
-      return {
-        month: name,
-        occupancy,
-      };
-    });
-  }, [filteredData]);
-
-  // Prepare data for current snapshot table
-  const currentSnapshotData = useMemo(() => {
-    if (filteredData.length === 0) return [];
-
-    // Find the most recent time period
-    const sortedData = [...filteredData].sort((a, b) => {
-      if (a.year !== b.year) return b.year - a.year;
-      return b.month - a.month;
-    });
-
-    if (sortedData.length === 0) return [];
-
-    const mostRecentYear = sortedData[0].year;
-    const mostRecentMonth = sortedData[0].month;
-
-    // Filter to only the most recent period
-    const recentData = filteredData.filter(
-      record => record.year === mostRecentYear && record.month === mostRecentMonth
-    );
-
-    // Group by berth type and calculate berth-days weighted occupancy
-    const berthTypeData = new Map<string, { totalOccupiedDays: number; totalDaysInMonth: number; berths: Set<string> }>();
-
-    recentData.forEach(record => {
-      const berthType = record.berthType || 'Unknown';
-      const existing = berthTypeData.get(berthType);
-
-      if (existing) {
-        existing.totalOccupiedDays += record.occupiedDays;
-        existing.totalDaysInMonth += record.daysInMonth;
-        existing.berths.add(record.berth);
-      } else {
-        berthTypeData.set(berthType, {
-          totalOccupiedDays: record.occupiedDays,
-          totalDaysInMonth: record.daysInMonth,
-          berths: new Set([record.berth]),
-        });
-      }
-    });
-
-    return Array.from(berthTypeData.entries()).map(([berthType, data]) => ({
-      berthType,
-      berths: data.berths.size,
-      occupancy: data.totalDaysInMonth > 0
-        ? Math.round(((data.totalOccupiedDays / data.totalDaysInMonth) * 100) * 10) / 10
-        : 0,
-    })).sort((a, b) => b.berths - a.berths);
-  }, [filteredData]);
-
+  const latestLabel = report.latest?.label ?? '—';
+  const partialMonths = report.months.filter(m => !m.complete);
   const handleExport = () => {
     exportToCSV(filteredData, 'time-based-occupancy.csv');
   };
@@ -409,7 +201,7 @@ export default function TimeBasedOccupancy({ onRefresh }: TimeBasedOccupancyProp
             Data Last Updated: {lastUpdated ? lastUpdated.toLocaleString('en-NZ') : 'Unknown'}
           </p>
           <p className="text-xs text-gray-500 mt-2">
-            This data uses berth-days weighted occupancy calculation (total occupied days / total available berth-days)
+            Berth-days weighted occupancy (total occupied berth-days / total available berth-days). Headline figures use the latest complete month.
           </p>
         </div>
         <div className="flex space-x-2">
@@ -552,20 +344,75 @@ export default function TimeBasedOccupancy({ onRefresh }: TimeBasedOccupancyProp
           <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-navy-700 to-navy-800" />
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-sm font-medium text-slate-500">Fleet-wide occupancy</p>
-              <p className="mt-3 text-3xl font-bold tracking-tight text-slate-900">{aggregateMetrics.fleetWideOccupancy}%</p>
+              <p className="text-sm font-medium text-slate-500">Occupancy, {latestLabel}</p>
+              <p className="mt-3 text-3xl font-bold tracking-tight text-slate-900">{formatPct(report.latest?.occupancy)}</p>
+              <p className="mt-2 text-xs text-slate-500">
+                {renderDelta(report.yoy)} vs {report.sameMonthLastYear?.label ?? 'last year'}
+              </p>
             </div>
             <div className="flex h-11 w-11 items-center justify-center rounded-xl text-lg font-semibold bg-navy-100 text-navy-700">
               📊
             </div>
           </div>
         </div>
+
+        <div className="metric-card">
+          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-500 to-emerald-600" />
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium text-slate-500">Last 12 months</p>
+              <p className="mt-3 text-3xl font-bold tracking-tight text-slate-900">{formatPct(report.last12)}</p>
+              <p className="mt-2 text-xs text-slate-500">
+                {renderDelta(report.last12Change)} vs previous 12 months ({formatPct(report.prev12)})
+              </p>
+            </div>
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl text-lg font-semibold bg-emerald-100 text-emerald-700">
+              📈
+            </div>
+          </div>
+        </div>
+
+        <div className="metric-card">
+          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-amber-500 to-amber-600" />
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium text-slate-500">Empty berths</p>
+              <p className="mt-3 text-3xl font-bold tracking-tight text-slate-900">{Math.round(report.emptyBerths).toLocaleString()}</p>
+              <p className="mt-2 text-xs text-slate-500">
+                on an average day in {latestLabel} — {report.totalBerths > 0 ? ((report.emptyBerths / report.totalBerths) * 100).toFixed(1) : '0.0'}% of {report.totalBerths.toLocaleString()} berths
+              </p>
+            </div>
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl text-lg font-semibold bg-amber-100 text-amber-700">
+              🛥️
+            </div>
+          </div>
+        </div>
+
+        <div className="metric-card">
+          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-violet-500 to-violet-600" />
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium text-slate-500">Period peak / low</p>
+              <p className="mt-3 text-3xl font-bold tracking-tight text-slate-900">
+                {formatPct(report.peak?.occupancy)} <span className="text-lg font-semibold text-slate-400">/ {formatPct(report.low?.occupancy)}</span>
+              </p>
+              <p className="mt-2 text-xs text-slate-500">
+                Peak {report.peak?.label ?? '—'} · Low {report.low?.label ?? '—'} (complete months)
+              </p>
+            </div>
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl text-lg font-semibold bg-violet-100 text-violet-700">
+              ↕
+            </div>
+          </div>
+        </div>
+
         <div className="metric-card">
           <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-rose-500 to-rose-600" />
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-sm font-medium text-slate-500">Total Berths</p>
-              <p className="mt-3 text-3xl font-bold tracking-tight text-slate-900">{aggregateMetrics.totalBerths.toLocaleString()}</p>
+              <p className="mt-3 text-3xl font-bold tracking-tight text-slate-900">{report.totalBerths.toLocaleString()}</p>
+              <p className="mt-2 text-xs text-slate-500">tracked in {latestLabel}</p>
             </div>
             <div className="flex h-11 w-11 items-center justify-center rounded-xl text-lg font-semibold bg-rose-100 text-rose-700">
               ⚓
@@ -578,7 +425,8 @@ export default function TimeBasedOccupancy({ onRefresh }: TimeBasedOccupancyProp
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-sm font-medium text-slate-500">Categories</p>
-              <p className="mt-3 text-3xl font-bold tracking-tight text-slate-900">{aggregateMetrics.categories}</p>
+              <p className="mt-3 text-3xl font-bold tracking-tight text-slate-900">{report.categories}</p>
+              <p className="mt-2 text-xs text-slate-500">berth types in selection</p>
             </div>
             <div className="flex h-11 w-11 items-center justify-center rounded-xl text-lg font-semibold bg-sky-100 text-sky-700">
               📁
@@ -587,10 +435,28 @@ export default function TimeBasedOccupancy({ onRefresh }: TimeBasedOccupancyProp
         </div>
       </div>
 
+      {/* Executive Summary */}
+      {report.insights.length > 0 && (
+        <div className="card">
+          <div className="card-header">
+            <h3 className="card-title">Executive summary</h3>
+            <p className="text-sm text-gray-500">Headline figures use {latestLabel}, the latest complete month.</p>
+          </div>
+          <ul className="space-y-2 list-disc pl-5 text-sm text-slate-700">
+            {report.insights.map((insight, i) => (
+              <li key={i}>{insight}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* Month-by-Month Occupancy Chart */}
       <div className="card">
         <div className="card-header">
           <h3 className="card-title">Overall occupancy, month by month (berth-days weighted)</h3>
+          <p className="text-sm text-gray-500">
+            Monthly occupancy with 12-month rolling average. Partial months are shown hollow and excluded from peak, low and headline figures.
+          </p>
         </div>
         <div className="p-4">
           <ResponsiveContainer width="100%" height={400}>
@@ -601,65 +467,129 @@ export default function TimeBasedOccupancy({ onRefresh }: TimeBasedOccupancyProp
                 tick={{ fontSize: 12 }}
               />
               <YAxis
-                domain={[80, 100]}
+                domain={[(dataMin: number) => Math.max(0, Math.floor(dataMin - 5)), 100]}
                 tick={{ fontSize: 12 }}
                 label={{ value: 'Occupancy %', angle: -90, position: 'insideLeft' }}
               />
               <Tooltip
-                formatter={(value: number) => [`${value}%`, 'Occupancy']}
-                labelFormatter={(label: string) => `Month: ${label}`}
+                formatter={(value, name) => [`${value}%`, name]}
+                labelFormatter={(label) => `Month: ${label}`}
               />
               <Legend />
               <Line
                 type="monotone"
                 dataKey="occupancy"
+                name="Monthly occupancy"
                 stroke="#2563eb"
                 strokeWidth={2}
-                dot={{ fill: '#2563eb', strokeWidth: 2, r: 4 }}
+                dot={(props: any) => (
+                  <circle
+                    key={`dot-${props.index}`}
+                    cx={props.cx}
+                    cy={props.cy}
+                    r={4}
+                    stroke="#2563eb"
+                    strokeWidth={2}
+                    fill={props.payload?.partial ? '#fff' : '#2563eb'}
+                  />
+                )}
                 activeDot={{ r: 6 }}
+              />
+              <Line
+                type="monotone"
+                dataKey="rolling"
+                name="12-month rolling average"
+                stroke="#f59e0b"
+                strokeWidth={2}
+                strokeDasharray="6 4"
+                dot={false}
+                connectNulls
               />
             </LineChart>
           </ResponsiveContainer>
         </div>
       </div>
 
-      {/* Occupancy by Berth Type Over Time Chart */}
+      {/* Performance by Berth Type */}
       <div className="card">
         <div className="card-header">
-          <h3 className="card-title">Occupancy by berth type, year over year</h3>
-          <p className="text-sm text-gray-500">Annual occupancy by category (berth-days weighted)</p>
+          <h3 className="card-title">Performance by berth type, year over year</h3>
+          <p className="text-sm text-gray-500">Annual occupancy for the largest categories, weighted by berth-days</p>
         </div>
         <div className="p-4">
-          <ResponsiveContainer width="100%" height={400}>
-            <LineChart data={berthTypeChartData}>
+          <ResponsiveContainer width="100%" height={350}>
+            <BarChart data={annualChartData}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis
-                dataKey="month"
-                tick={{ fontSize: 12 }}
-              />
+              <XAxis dataKey="year" tick={{ fontSize: 12 }} />
               <YAxis
                 domain={[0, 100]}
                 tick={{ fontSize: 12 }}
                 label={{ value: 'Occupancy %', angle: -90, position: 'insideLeft' }}
               />
-              <Tooltip
-                formatter={(value: number) => [`${value}%`, '']}
-                labelFormatter={(label: string) => `Month: ${label}`}
-              />
+              <Tooltip formatter={(value, name) => [`${value}%`, name]} />
               <Legend />
-              {chartBerthTypes.map((berthType) => (
-                <Line
-                  key={berthType}
-                  type="monotone"
-                  dataKey={berthType}
-                  stroke={getBerthTypeColor(berthType)}
-                  strokeWidth={2}
-                  dot={{ fill: getBerthTypeColor(berthType), strokeWidth: 2, r: 4 }}
-                  activeDot={{ r: 6 }}
+              {largestTypes.map(t => (
+                <Bar
+                  key={t.berthType}
+                  dataKey={t.berthType}
+                  name={`${t.berthType} · ${t.berths.toLocaleString()} berths`}
+                  fill={getBerthTypeColor(t.berthType)}
+                  radius={[4, 4, 0, 0]}
                 />
               ))}
-            </LineChart>
+            </BarChart>
           </ResponsiveContainer>
+        </div>
+
+        <div className="overflow-x-auto px-4 pb-4">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Berth type</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Berths</th>
+                {report.years.map(y => (
+                  <th key={y} className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    {y}{report.partialYears[y] ? '*' : ''}
+                  </th>
+                ))}
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Change †</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {report.byType.map(t => (
+                <tr key={t.berthType} className="hover:bg-gray-50">
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                    {t.berthType}
+                    {t.smallSample && <span className="badge badge-warning ml-2">small sample</span>}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-900">{t.berths.toLocaleString()}</td>
+                  {report.years.map(y => (
+                    <td key={y} className="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-900">
+                      {t.annual[y] == null ? '—' : t.annual[y]!.toFixed(1)}
+                    </td>
+                  ))}
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-right">{renderDelta(t.change)}</td>
+                </tr>
+              ))}
+              <tr className="bg-gray-50 font-semibold">
+                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">All selected</td>
+                <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-900">{report.allSelected.berths.toLocaleString()}</td>
+                {report.years.map(y => (
+                  <td key={y} className="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-900">
+                    {report.allSelected.annual[y] == null ? '—' : report.allSelected.annual[y]!.toFixed(1)}
+                  </td>
+                ))}
+                <td className="px-4 py-3 whitespace-nowrap text-sm text-right">{renderDelta(report.allSelected.change)}</td>
+              </tr>
+            </tbody>
+          </table>
+          <p className="mt-3 text-xs text-gray-500">
+            {Object.keys(report.partialYears).length > 0 && (
+              <>* Partial year: {Object.entries(report.partialYears).map(([y, n]) => `${y} (${n} month${n === 1 ? '' : 's'})`).join(', ')}. </>
+            )}
+            † Last 12 complete months vs first 12 months of data, in percentage points.
+            Categories with fewer than {SMALL_SAMPLE_BERTHS} berths move in large steps; treat as directional.
+          </p>
         </div>
       </div>
 
@@ -669,7 +599,14 @@ export default function TimeBasedOccupancy({ onRefresh }: TimeBasedOccupancyProp
         <div className="card">
           <div className="card-header">
             <h3 className="card-title">Seasonal pattern</h3>
-            <p className="text-sm text-gray-500">Occupancy by month of year (berth-days weighted)</p>
+            <p className="text-sm text-gray-500">Occupancy by month of year, all years combined (berth-days weighted)</p>
+            {report.strongestMonth && report.weakestMonth && (
+              <p className="text-sm text-gray-700 mt-1">
+                Strongest: <span className="font-medium">{report.strongestMonth.month} {formatPct(report.strongestMonth.occupancy)}</span>
+                {' · '}
+                Weakest: <span className="font-medium">{report.weakestMonth.month} {formatPct(report.weakestMonth.occupancy)}</span>
+              </p>
+            )}
           </div>
           <div className="p-4">
             <ResponsiveContainer width="100%" height={300}>
@@ -683,12 +620,12 @@ export default function TimeBasedOccupancy({ onRefresh }: TimeBasedOccupancyProp
                   height={60}
                 />
                 <YAxis
-                  domain={[85, 100]}
+                  domain={[(dataMin: number) => Math.max(0, Math.floor(dataMin - 5)), 100]}
                   tick={{ fontSize: 12 }}
                   label={{ value: 'Occupancy %', angle: -90, position: 'insideLeft' }}
                 />
                 <Tooltip
-                  formatter={(value: number) => [`${value}%`, 'Occupancy']}
+                  formatter={(value) => [`${value}%`, 'Occupancy']}
                 />
                 <Bar
                   dataKey="occupancy"
@@ -704,41 +641,86 @@ export default function TimeBasedOccupancy({ onRefresh }: TimeBasedOccupancyProp
         <div className="card">
           <div className="card-header">
             <h3 className="card-title">Current snapshot</h3>
-            <p className="text-sm text-gray-500">Berth-days weighted occupancy by type</p>
+            <p className="text-sm text-gray-500">
+              Berth count and occupancy by category for {latestLabel}, the latest complete month.
+              "Empty berths" is the average number of berths unoccupied on any given day.
+            </p>
           </div>
-          <div className="p-4">
+          <div className="p-4 overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Berth type</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Berths</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Occupancy</th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Berth type</th>
+                  <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Berths</th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Occupancy</th>
+                  <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    vs {report.sameMonthLastYear?.label ?? 'last year'}
+                  </th>
+                  <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Empty</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {currentSnapshotData.map((item, index) => (
-                  <tr key={index} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{item.berthType}</td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{item.berths}</td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                {[...report.byType.map(t => ({ ...t, total: false })), { ...report.allSelected, berthType: 'All selected', smallSample: false, total: true }].map(item => (
+                  <tr key={item.berthType} className={item.total ? 'bg-gray-50 font-semibold' : 'hover:bg-gray-50'}>
+                    <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
+                      {item.berthType}
+                      {item.smallSample && <span className="badge badge-warning ml-2">small</span>}
+                    </td>
+                    <td className="px-3 py-3 whitespace-nowrap text-sm text-right text-gray-900">{item.berths.toLocaleString()}</td>
+                    <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
                       <div className="flex items-center">
-                        <div className="flex-1 mr-3">
+                        <div className="flex-1 mr-3 min-w-[60px]">
                           <div className="w-full bg-gray-200 rounded-full h-2">
                             <div
                               className="bg-blue-600 h-2 rounded-full"
-                              style={{ width: `${item.occupancy}%` }}
+                              style={{ width: `${item.latest ?? 0}%` }}
                             />
                           </div>
                         </div>
-                        <span className="text-sm font-medium">{item.occupancy}%</span>
+                        <span className="text-sm font-medium">{formatPct(item.latest)}</span>
                       </div>
                     </td>
+                    <td className="px-3 py-3 whitespace-nowrap text-sm text-right">{renderDelta(item.vsLastYear)}</td>
+                    <td className="px-3 py-3 whitespace-nowrap text-sm text-right text-gray-900">{Math.round(item.emptyBerths).toLocaleString()}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         </div>
+      </div>
+
+      {/* Notes & Methodology */}
+      <div className="card">
+        <div className="card-header">
+          <h3 className="card-title">Notes &amp; methodology</h3>
+        </div>
+        <ul className="space-y-2 list-disc pl-5 text-sm text-slate-600">
+          <li>
+            Occupancy = occupied berth-days ÷ available berth-days × 100. Every figure (monthly, annual, seasonal,
+            per category and filtered totals) is calculated from the underlying berth-days, so larger categories carry
+            proportionally more weight.
+          </li>
+          <li>
+            Headline figures use {latestLabel}, the latest complete month. Peak and low are taken from complete months only.
+          </li>
+          {partialMonths.length > 0 && (
+            <li>
+              Partial months: {partialMonths.map(m => `${m.label} (${m.daysCovered} of ${new Date(m.year, m.month, 0).getDate()} days)`).join(', ')}.
+              They are shown hollow on the monthly chart and contribute to annual and seasonal averages in proportion to their days.
+            </li>
+          )}
+          <li>
+            Empty berths = berths × (1 − occupancy) for the month, i.e. the average number of berths unoccupied on a given day.
+          </li>
+          {report.byType.some(t => t.smallSample) && (
+            <li>
+              Small categories: {report.byType.filter(t => t.smallSample).map(t => `${t.berthType} (${t.berths})`).join(', ')} berths.
+              Figures for these move in large steps and should be read as directional.
+            </li>
+          )}
+          <li>Source: TimeBasedOccupancy.xlsx — {filteredData.length.toLocaleString()} rows used.</li>
+        </ul>
       </div>
     </div>
   );

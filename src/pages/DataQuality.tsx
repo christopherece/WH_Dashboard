@@ -2,9 +2,10 @@ import { DataQualityReport } from '../types/berth';
 
 interface DataQualityProps {
   dataQuality: DataQualityReport | null;
+  lastUpdated: Date | null;
 }
 
-export default function DataQuality({ dataQuality }: DataQualityProps) {
+export default function DataQuality({ dataQuality, lastUpdated }: DataQualityProps) {
   if (!dataQuality) {
     return (
       <div className="p-6">
@@ -21,7 +22,7 @@ export default function DataQuality({ dataQuality }: DataQualityProps) {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Data Quality Report</h1>
         <p className="text-sm text-gray-600 mt-1">
-          Last loaded: {new Date().toLocaleString('en-NZ')}
+          Last loaded: {lastUpdated ? lastUpdated.toLocaleString('en-NZ') : 'Unknown'}
         </p>
       </div>
 

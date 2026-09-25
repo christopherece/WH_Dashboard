@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { BerthRecord } from '../types/berth';
-import { exportToCSV } from '../utils/dataUtils';
+import { exportToCSV, getExpiryStatus } from '../utils/dataUtils';
 
 interface VesselComplianceReportProps {
   data: BerthRecord[];
@@ -13,38 +13,26 @@ export default function VesselComplianceReport({ data, lastUpdated, onRefresh }:
   const [warningDays, setWarningDays] = useState(30); // Days before expiry to show as warning
   const [complianceFilter, setComplianceFilter] = useState<'all' | 'compliant' | 'warning' | 'non-compliant'>('all');
   const [sizeFilter, setSizeFilter] = useState<'all' | 'compatible' | 'over-size' | 'under-size'>('all');
-  const [insuranceFilter, setInsuranceFilter] = useState<'all' | 'valid' | 'expiring-soon' | 'expired'>('all');
-  const [ewofFilter, setEwofFilter] = useState<'all' | 'valid' | 'expiring-soon' | 'expired'>('all');
-  const [tntFilter, setTntFilter] = useState<'all' | 'valid' | 'expiring-soon' | 'expired'>('all');
+  const [insuranceFilter, setInsuranceFilter] = useState<'all' | 'valid' | 'expiring-soon' | 'expired' | 'missing'>('all');
+  const [ewofFilter, setEwofFilter] = useState<'all' | 'valid' | 'expiring-soon' | 'expired' | 'missing'>('all');
+  const [tntFilter, setTntFilter] = useState<'all' | 'valid' | 'expiring-soon' | 'expired' | 'missing'>('all');
 
   const complianceData = useMemo(() => {
-    const today = new Date();
-    const warningDate = new Date();
-    warningDate.setDate(today.getDate() + warningDays);
-
     return data
       .filter(record => record.occupancyStatus === 'Rented' && record.vesselName) // Only occupied berths with vessels
       .map(record => {
         const ewofRequired = Boolean(record.ewofRequired);
         const tntRequired = Boolean(record.tntRequired);
 
-        // Determine compliance status for each field
-        const getComplianceStatus = (expiryDate: Date | null, isRequired: boolean) => {
-          if (!isRequired) return 'Valid';
-          if (!expiryDate) return 'Expired';
-          
-          if (expiryDate < today) return 'Expired';
-          if (expiryDate <= warningDate) return 'Expiring Soon';
-          return 'Valid';
-        };
-
-        const insuranceStatus = getComplianceStatus(record.insuranceExpiry, true);
-        const ewofStatus = getComplianceStatus(record.ewofExpiry, ewofRequired);
-        const tntStatus = getComplianceStatus(record.tntExpiry, tntRequired);
+        const insuranceStatus = getExpiryStatus(record.insuranceExpiry, true, warningDays);
+        const ewofStatus = getExpiryStatus(record.ewofExpiry, ewofRequired, warningDays);
+        const tntStatus = getExpiryStatus(record.tntExpiry, tntRequired, warningDays);
 
         // Determine overall compliance
-        const hasExpired = insuranceStatus === 'Expired' || ewofStatus === 'Expired' || tntStatus === 'Expired';
-        const hasWarning = insuranceStatus === 'Expiring Soon' || ewofStatus === 'Expiring Soon' || tntStatus === 'Expiring Soon';
+        // Missing required documents count as non-compliant (the query reports them as INCOMPLETE).
+        const statuses = [insuranceStatus, ewofStatus, tntStatus];
+        const hasExpired = statuses.some(status => status === 'Expired' || status === 'Missing');
+        const hasWarning = statuses.includes('Expiring Soon');
         
         let overallCompliance: 'Compliant' | 'Warning' | 'Non-Compliant';
         if (hasExpired) overallCompliance = 'Non-Compliant';
@@ -151,6 +139,7 @@ export default function VesselComplianceReport({ data, lastUpdated, onRefresh }:
           case 'valid': return c.insuranceStatus === 'Valid';
           case 'expiring-soon': return c.insuranceStatus === 'Expiring Soon';
           case 'expired': return c.insuranceStatus === 'Expired';
+          case 'missing': return c.insuranceStatus === 'Missing';
           default: return true;
         }
       });
@@ -163,6 +152,7 @@ export default function VesselComplianceReport({ data, lastUpdated, onRefresh }:
           case 'valid': return c.ewofStatus === 'Valid';
           case 'expiring-soon': return c.ewofStatus === 'Expiring Soon';
           case 'expired': return c.ewofStatus === 'Expired';
+          case 'missing': return c.ewofStatus === 'Missing';
           default: return true;
         }
       });
@@ -175,6 +165,7 @@ export default function VesselComplianceReport({ data, lastUpdated, onRefresh }:
           case 'valid': return c.tntStatus === 'Valid';
           case 'expiring-soon': return c.tntStatus === 'Expiring Soon';
           case 'expired': return c.tntStatus === 'Expired';
+          case 'missing': return c.tntStatus === 'Missing';
           default: return true;
         }
       });
@@ -213,6 +204,7 @@ export default function VesselComplianceReport({ data, lastUpdated, onRefresh }:
       case 'Under Size':
         return <span className="badge badge-warning">{status}</span>;
       case 'Expired':
+      case 'Missing':
       case 'Non-Compliant':
       case 'Over Size':
         return <span className="badge badge-danger">{status}</span>;
@@ -414,6 +406,7 @@ export default function VesselComplianceReport({ data, lastUpdated, onRefresh }:
                 <option value="valid">Valid</option>
                 <option value="expiring-soon">Expiring Soon</option>
                 <option value="expired">Expired</option>
+                <option value="missing">Missing</option>
               </select>
             </div>
 
@@ -429,6 +422,7 @@ export default function VesselComplianceReport({ data, lastUpdated, onRefresh }:
                 <option value="valid">Valid</option>
                 <option value="expiring-soon">Expiring Soon</option>
                 <option value="expired">Expired</option>
+                <option value="missing">Missing</option>
               </select>
             </div>
 
@@ -444,6 +438,7 @@ export default function VesselComplianceReport({ data, lastUpdated, onRefresh }:
                 <option value="valid">Valid</option>
                 <option value="expiring-soon">Expiring Soon</option>
                 <option value="expired">Expired</option>
+                <option value="missing">Missing</option>
               </select>
             </div>
 

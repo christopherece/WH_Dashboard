@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { BerthRecord } from '../types/berth';
-import { exportToCSV } from '../utils/dataUtils';
+import { exportToCSV, getUniqueCustomerAges } from '../utils/dataUtils';
 
 interface CustomerAgeReportProps {
   data: BerthRecord[];
@@ -9,25 +9,9 @@ interface CustomerAgeReportProps {
   onRefresh: () => void;
 }
 
-const calculateCustomerAge = (dateOfBirth: Date | null): number | null => {
-  if (!dateOfBirth || Number.isNaN(dateOfBirth.getTime())) return null;
-
-  const today = new Date();
-  let age = today.getFullYear() - dateOfBirth.getFullYear();
-  const monthDiff = today.getMonth() - dateOfBirth.getMonth();
-
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dateOfBirth.getDate())) {
-    age -= 1;
-  }
-
-  return age;
-};
-
 export default function CustomerAgeReport({ data, lastUpdated, onRefresh }: CustomerAgeReportProps) {
   const ageSummary = useMemo(() => {
-    const validAges = data
-      .map((record) => calculateCustomerAge(record.customerDateOfBirth))
-      .filter((age): age is number => age !== null && age >= 20);
+    const validAges = getUniqueCustomerAges(data);
 
     if (!validAges.length) {
       return {

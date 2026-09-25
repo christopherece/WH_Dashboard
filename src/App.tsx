@@ -107,7 +107,7 @@ function App() {
       case 'reports':
         return <Reports data={filteredData} lastUpdated={lastUpdated} onRefresh={handleRefresh} />;
       case 'quality':
-        return <DataQuality dataQuality={dataQuality} />;
+        return <DataQuality dataQuality={dataQuality} lastUpdated={lastUpdated} />;
       case 'compliance':
         return <VesselComplianceReport data={data} lastUpdated={lastUpdated} onRefresh={handleRefresh} />;
       case 'reversion':
